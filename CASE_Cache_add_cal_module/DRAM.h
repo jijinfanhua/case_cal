@@ -55,6 +55,7 @@ void DRAM::writeToFile(string filename) {
 	map<int, int>::iterator it;
 	it = container.begin();
 	while (it != container.end()) {
+		cout << it->first << " ::" << it->second << endl;
 		fprintf(fp, "%d\t%d\n", it->first, it->second);
 		it++;
 	}

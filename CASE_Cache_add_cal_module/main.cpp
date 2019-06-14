@@ -155,6 +155,9 @@ void * case_func(ThreadArg * arg) {
 			}
 		}
 	}
+	lru1->writeAllToDRAM();
+	lru2->writeAllToSRAM();
+
 	string str1 = "sram_estimate_value_";
 	string str2 = "dram_accurate_value_";
 	string str3 = std::to_string(index);
