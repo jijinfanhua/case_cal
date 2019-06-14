@@ -1,0 +1,22 @@
+﻿生成启动时间为 2019/6/14 9:06:04。
+     1>项目“D:\高速网路测量\CASE_Cache_add_cal\CASE_Cache_add_cal_module\CASE_Cache_add_cal_module\CASE_Cache_add_cal_module.vcxproj”在节点 2 上(Build 个目标)。
+       项目文件包含 ToolsVersion="14.0"。此工具集可能未知或缺失。在这种情况下，通过安装 MSBuild 的正确版本，或许可以解决此问题。否则，该 build 可能已因策略原因而被强制为某个特定 ToolsVersion。将该项目视为其已具有 ToolsVersion="4.0"。有关详细信息，请参阅 http://go.microsoft.com/fwlink/?LinkId=291333。
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\x86_amd64\CL.exe /c /Zi /nologo /W3 /WX- /sdl /Od /D _DEBUG /D _CONSOLE /D _CRT_SECURE_NO_WARNINGS /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"x64\Debug\\" /Fd"x64\Debug\vc110.pdb" /Gd /TP /errorReport:prompt main.cpp
+         main.cpp
+     1>d:\高速网路测量\case_cache_add_cal\case_cache_add_cal_module\case_cache_add_cal_module\cal.h(41): warning C4244: “=”: 从“double”转换到“long”，可能丢失数据
+     1>d:\高速网路测量\case_cache_add_cal\case_cache_add_cal_module\case_cache_add_cal_module\cal.h(45): warning C4244: “=”: 从“double”转换到“long”，可能丢失数据
+     1>d:\高速网路测量\case_cache_add_cal\case_cache_add_cal_module\case_cache_add_cal_module\cal.h(49): warning C4244: “=”: 从“double”转换到“long”，可能丢失数据
+     1>d:\高速网路测量\case_cache_add_cal\case_cache_add_cal_module\case_cache_add_cal_module\SRAM.h(24): warning C4091: “typedef ”: 没有声明变量时忽略“S_element”的左侧
+     1>d:\高速网路测量\case_cache_add_cal\case_cache_add_cal_module\case_cache_add_cal_module\SRAM.h(94): warning C4267: “return”: 从“size_t”转换到“int”，可能丢失数据
+     1>d:\高速网路测量\case_cache_add_cal\case_cache_add_cal_module\case_cache_add_cal_module\big_lru.h(47): warning C4334: “<<”: 32 位移位的结果被隐式转换为 64 位(是否希望进行 64 位移位?)
+     1>d:\高速网路测量\case_cache_add_cal\case_cache_add_cal_module\case_cache_add_cal_module\DRAM.h(65): warning C4267: “return”: 从“size_t”转换到“int”，可能丢失数据
+     1>d:\高速网路测量\case_cache_add_cal\case_cache_add_cal_module\case_cache_add_cal_module\small_lru.h(45): warning C4334: “<<”: 32 位移位的结果被隐式转换为 64 位(是否希望进行 64 位移位?)
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\x86_amd64\link.exe /ERRORREPORT:PROMPT /OUT:"D:\高速网路测量\CASE_Cache_add_cal\CASE_Cache_add_cal_module\x64\Debug\CASE_Cache_add_cal_module.exe" /INCREMENTAL /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"D:\高速网路测量\CASE_Cache_add_cal\CASE_Cache_add_cal_module\x64\Debug\CASE_Cache_add_cal_module.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"D:\高速网路测量\CASE_Cache_add_cal\CASE_Cache_add_cal_module\x64\Debug\CASE_Cache_add_cal_module.lib" /MACHINE:X64 x64\Debug\main.obj
+         CASE_Cache_add_cal_module.vcxproj -> D:\高速网路测量\CASE_Cache_add_cal\CASE_Cache_add_cal_module\x64\Debug\CASE_Cache_add_cal_module.exe
+     1>已完成生成项目“D:\高速网路测量\CASE_Cache_add_cal\CASE_Cache_add_cal_module\CASE_Cache_add_cal_module\CASE_Cache_add_cal_module.vcxproj”(Build 个目标)的操作。
+
+生成成功。
+
+已用时间 00:00:02.21
