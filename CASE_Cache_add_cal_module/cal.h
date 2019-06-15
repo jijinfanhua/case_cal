@@ -1,6 +1,9 @@
 #pragma once
 
 #include <iostream>
+#define COMPRESS 0
+
+typedef long int llint;
 
 class Calculate {
 private:
@@ -11,15 +14,15 @@ private:
 
 private:
 	// private functions
-	long OEFUpdate(long c, long l, double a);
-	double FC_OEF(long c, double a);
+	llint OEFUpdate(llint c, llint l, double a);
+	double FC_OEF(llint c, double a);
 	double INV_FC_OEF(double n, double a);
-	long OEF_renor(double a1, double a2, long c1);// previous a1,c1;next a2,c2;
+	llint OEF_renor(double a1, double a2, llint c1);// previous a1,c1;next a2,c2;
 
 public:
 	void init();
-	void update(long int *symb_value, int ByteCnt, int *scale_value);
-	long backToRealValue(int symb_value, int scale);
+	void update(llint *symb_value, int ByteCnt, int *scale_value);
+	llint backToRealValue(llint symb_value, int scale);
 };
 
 // init 4 compression parameter
@@ -30,8 +33,10 @@ void Calculate::init() {
 	a_15 = pow(0.5, 15.0);
 }
 
-long Calculate::backToRealValue(int symb_value, int scale) {
-	long esti_value;
+llint Calculate::backToRealValue(llint symb_value, int scale) {
+	if(!COMPRESS)
+		return symb_value;
+	llint esti_value;
 	if (scale == 0)
 	{
 		esti_value = symb_value;
@@ -51,7 +56,11 @@ long Calculate::backToRealValue(int symb_value, int scale) {
 	return esti_value;
 }
 
-void Calculate::update(long int *symb_value, int ByteCnt, int *scale_value) {
+void Calculate::update(llint *symb_value, int ByteCnt, int *scale_value) {
+	if(!COMPRESS) {
+		*symb_value += ByteCnt;
+		return;
+	}	
 	if (*scale_value == 0) {
 		*symb_value += ByteCnt;
 		if (*symb_value > 65535) {
@@ -60,7 +69,7 @@ void Calculate::update(long int *symb_value, int ByteCnt, int *scale_value) {
 		}
 	}
 	else if (*scale_value == 1) {
-		*symb_value += OEFUpdate(*symb_value, (long)ByteCnt, a_15);
+		*symb_value += OEFUpdate(*symb_value, (llint)ByteCnt, a_15);
 		if (*symb_value > 209345)
 		{
 			*scale_value = 2;
@@ -68,7 +77,7 @@ void Calculate::update(long int *symb_value, int ByteCnt, int *scale_value) {
 		}
 	}
 	else if (*scale_value == 2) {
-		*symb_value += OEFUpdate(*symb_value, (long)ByteCnt, a_12);
+		*symb_value += OEFUpdate(*symb_value, (llint)ByteCnt, a_12);
 		if (*symb_value > 36322063329)
 		{
 			*scale_value = 3;
@@ -77,11 +86,11 @@ void Calculate::update(long int *symb_value, int ByteCnt, int *scale_value) {
 	}
 	else if (*scale_value == 3)//a_11
 	{
-		*symb_value += OEFUpdate(*symb_value, (long)ByteCnt, a_11);
+		*symb_value += OEFUpdate(*symb_value, (llint)ByteCnt, a_11);
 	}
 }
 
-long Calculate::OEFUpdate(long c, long l, double a) {
+llint Calculate::OEFUpdate(llint c, llint l, double a) {
 	double v = (double)(rand() / (double)RAND_MAX);
 
 	double f_c = FC_OEF(c, a);//f(c)
@@ -99,7 +108,7 @@ long Calculate::OEFUpdate(long c, long l, double a) {
 		return (long)(delta);
 }
 
-double Calculate::FC_OEF(long c, double a) {
+double Calculate::FC_OEF(llint c, double a) {
 	double x = (pow((1 + a), (double)c) - 1) / a*(2 + a) / 2;
 	return x;
 }
@@ -111,19 +120,19 @@ double Calculate::INV_FC_OEF(double n, double a) {
 	return x;
 }
 
-long Calculate::OEF_renor(double a1, double a2, long c1) {
+llint Calculate::OEF_renor(double a1, double a2, llint c1) {
 	double v = (double)(rand() / (double)RAND_MAX);//generate a random number 0<x<1
-	long c2;
+	llint c2;
 	double c2_temp;
 	c2_temp = log(a2*(2 + a1) / a1 / (2 + a2)*(pow(1 + a1, (double)c1) - 1) + 1.0) / log(1 + a2);
 	double pd = c2_temp - (long)c2_temp;
 	if (v <= pd)
 	{
-		c2 = (long)(c2_temp + 1);
+		c2 = (llint)(c2_temp + 1);
 	}
 	else
 	{
-		c2 = (long)c2_temp;
+		c2 = (llint)c2_temp;
 	}
 	return c2;
 }

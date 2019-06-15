@@ -51,11 +51,11 @@ int DRAM::find(int FlowId) {
 }
 
 void DRAM::writeToFile(string filename) {
-	FILE * fp = fopen(filename.c_str(), "a+");
+	FILE * fp = fopen(filename.c_str(), "w");
 	map<int, int>::iterator it;
 	it = container.begin();
 	while (it != container.end()) {
-		cout << it->first << " ::" << it->second << endl;
+		//cout << it->first << " ::" << it->second << endl;
 		fprintf(fp, "%d\t%d\n", it->first, it->second);
 		it++;
 	}

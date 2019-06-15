@@ -17,10 +17,10 @@ using namespace std;
 
 typedef struct S_element {
 public:
-	long symb_value;
+	llint symb_value;
 	int scale;
 	S_element() {}
-	S_element(long symb, int sca) :symb_value(symb), scale(sca) {}
+	S_element(llint symb, int sca) :symb_value(symb), scale(sca) {}
 };
 
 class SRAM {
@@ -35,7 +35,7 @@ public:
 	long find(int FlowId);
 	void init();
 	void writeToFile(string filename);
-	long backToRealValue(int symb, int scale);
+	long backToRealValue(llint symb, int scale);
 };
 
 void SRAM::init() {
@@ -48,7 +48,7 @@ void SRAM::insert(int FlowId, int ByteCnt) {
 	it = container.find(FlowId);
 
 	int scale = 0;
-	long symb = 0;
+	llint symb = 0;
 
 	if (it == container.end()) {
 		cal->update(&symb, ByteCnt, &scale);
@@ -78,13 +78,13 @@ long SRAM::find(int FlowId) {
 }
 
 void SRAM::writeToFile(string filename) {
-	FILE * fp = fopen(filename.c_str(), "a+");
+	FILE * fp = fopen(filename.c_str(), "w");
 	map<int, S_element>::iterator it;
 	it = container.begin();
-	int esti_value;
+	llint esti_value;
 	while (it != container.end()) {
 		esti_value = cal->backToRealValue(it->second.symb_value, it->second.scale);
-		fprintf(fp, "%d\t%ld\n", it->first, esti_value);
+		fprintf(fp, "%d\t%lld\n", it->first, esti_value);
 		it++;
 	}
 	fclose(fp);

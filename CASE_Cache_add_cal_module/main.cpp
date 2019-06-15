@@ -29,7 +29,9 @@
 
 #define PACKET_MAX 10000000
 
-#define SCALE 100//10000000//20000
+#define SCALE 10000000//10000000//20000
+
+#define WRITE 1
 
 using namespace std;
 
@@ -155,16 +157,19 @@ void * case_func(ThreadArg * arg) {
 			}
 		}
 	}
-	lru1->writeAllToDRAM();
-	lru2->writeAllToSRAM();
 
-	string str1 = "sram_estimate_value_";
-	string str2 = "dram_accurate_value_";
-	string str3 = std::to_string(index);
-	string str4 = ".txt";
-	lru1->dram->writeToFile(str2+str3+str4);
-	lru2->sram->writeToFile(str1+str3+str4);
+	if (WRITE) {
+		lru1->writeAllToDRAM();
+		lru2->writeAllToSRAM();
 
+		string str1 = "sram_estimate_value_";
+		string str2 = "dram_accurate_value_";
+		string str3 = std::to_string(index);
+		string str4 = ".txt";
+		lru1->dram->writeToFile(str2+str3+str4);
+		lru2->sram->writeToFile(str1+str3+str4);
+	
+	}
 	return NULL;
 }
 
@@ -213,9 +218,6 @@ int main() {
 	clock_t start, finish;
 	double totaltime;
 	start = clock();
-	/*for (int i = 0;i < SCALE;i++) {
-	test(buffer[i]);
-	}*/
 
 	for (int i = 0; i < THREAD_NUM; ++i) {
 		threads[i].join();
@@ -226,13 +228,6 @@ int main() {
 	cout << totaltime << endl;
 	double speed = PACKET_MAX / totaltime / 1000 / 1000;
 	cout << speed << endl;
-
-	//cout << total_len / 10 << endl;
-	//long long parallelMethodSum = 0;
-	//for (int i = 0; i < THREAD_NUM; ++i) {
-	//	parallelMethodSum += args[i].sum;
-	//}
-	//cout << parallelMethodSum / 10 << endl;
 
 	return 0;
 }
