@@ -1,44 +1,26 @@
-﻿//
-//  parse_and_read.cpp
-//  CASE_Cache
-//
-//  Created by fengyong on 2019/6/9.
-//  Copyright © 2019 fengyong. All rights reserved.
-//
-
-#include <iostream>
-#include <vector>
+﻿#include <iostream>
+#include <mutex>
+#include <queue>
+#include <condition_variable>
+#include <thread>
+#include <future>
 #include <string>
 #include <sstream>
 #include <fstream>
-#include <time.h>
-//#include <pthread.h>
-#include <thread>
-#include <limits>
-#include <Windows.h>
 
+#include "thread_safe_queue.h"
 #include "big_lru.h"
 #include "small_lru.h"
+#include "Queue.h"
 
-//#include <arpa/inet.h>
-
-
-#define THREAD_NUM 8
-
-#define CORE_NUM 4
-
-#define PACKET_MAX 10000000
-
-#define SCALE 10000000//10000000//20000
-
+#define SCALE 10000000
+#define THREAD_NUM 1
 #define WRITE 1
 
 using namespace std;
 
-long long total_len = 0;
-
-SmallLRU * smalllru[THREAD_NUM];
-BigLRU * biglru[THREAD_NUM];
+SmallLRU * smalllru;
+BigLRU * biglru;
 
 void SplitString(const string& s, vector<string>& v, const string& c) {
 	string::size_type pos1, pos2;
@@ -55,96 +37,197 @@ void SplitString(const string& s, vector<string>& v, const string& c) {
 }
 
 struct desc_item {
-	unsigned long item_index;
-
-	//in_addr ip_src;
-	//in_addr ip_des;
-	//string ip_src;
-	///string ip_des;
-	//unsigned short port_src;
-	//unsigned short port_des;
-	//unsigned char layer_4_proto; //1 UDP
-
-	unsigned short total_length;
-
-	desc_item() {}
-	//desc_item(unsigned long i_i, string s_ip, string d_ip, unsigned short s_p, unsigned short d_p, unsigned char p, unsigned short t_l) {
-	//	this->item_index = i_i;
-
-	//	this->ip_src = s_ip;
-	//	this->ip_des = d_ip;
-	//	this->port_src = s_p;
-	//	this->port_des = d_p;
-	//	this->layer_4_proto = p;
-
-	//	this->total_length = t_l;
-	//}
+    unsigned long flow_id;
+    unsigned short byte_cnt;
+    desc_item() {}
 	desc_item(string temp) {
 		vector<string> record;
 		SplitString(temp, record, " ");
 		stringstream ss;
 		ss << record[0];
-		ss >> this->item_index;
-		//cout << this->item_index << " ";
-
+		ss >> this->flow_id;
 		ss.clear();
-		/*if (record[1] == "17") {
-			this->layer_4_proto = '1'; //UDP
-		}
-
-		this->ip_src = record[2];
-		this->ip_des = record[3];
-		//cout << this->ip_src << " " << this->ip_des << " ";
-
-		ss.clear();
-		ss << record[4];
-		ss >> this->port_src;
-		//cout << this->port_src << " ";
-
-		ss.clear();
-		ss << record[5];
-		ss >> this->port_des;
-		//cout << this->port_des << " ";
-
-		ss.clear();*/
 		ss << record[1];
-		ss >> this->total_length;
-		//cout << this->total_length << endl;
+		ss >> this->byte_cnt;
 	}
 };
 
+ThreadSafeQueue<struct desc_item, std::condition_variable, std::mutex> buffer_q_LRU_1;
+//ThreadSafeQueue<struct desc_item, std::condition_variable, std::mutex> buffer_q_LRU_2;
+
+//Queue<desc_item> buffer_q_LRU_1(SCALE);
+//mutex LRU_1_lock;
+
+Queue<desc_item> buffer_q_LRU_2(SCALE);
+
+//从LRU_1来的新大流数据
+ThreadSafeQueue<struct desc_item, std::condition_variable, std::mutex> LRU_2_notifications;
+//Queue<desc_item> LRU_2_notifications(SCALE);
+//mutex LRU_2_notifications_lock;
+
+
 struct desc_item buffer[SCALE];
+long long buffer_index = 0;
 
-typedef struct ThreadArg {
-	long long base;
-	long long length;
-	long long sum;
-}ThreadArg;
+void * process_data () {
+	//可在此处（读取完成）加入起始时间戳，从而避免测量时间算入读取时间
+	int j = 0;
+    while (j < SCALE) {
+        //buffer_q_LRU_1.Push(buffer[j]);
+        buffer_q_LRU_2.push(buffer[j]);
+        j++;
+    }
+    return NULL;
+}
 
-void * case_func(ThreadArg * arg) {
-	//SetThreadAffinityMask(GetCurrentThread(),arg->thread_id);
-	long long begin = arg->base;
-	long long end = arg->base + arg->length;
-
-	long long index = arg->base / (SCALE / THREAD_NUM);
-	printf("index: %d\n", index);
-	SmallLRU * lru1 = smalllru[index];
-	BigLRU * lru2 = biglru[index];
-
-	//SmallLRU * lru1 = new SmallLRU();
-	//lru1->init(16 * 1024, 0x3fff, 14);
-	//BigLRU * lru2 = new BigLRU();
-	//lru2->init(112 * 1024, 0x3fff, 14);
-
-	int Flow_ID = 0, ByteCnt = 0;
-	for (long long i = begin; i < end; i++) {
-		Flow_ID = buffer[i].item_index;
-		ByteCnt = buffer[i].total_length;
+#if(0)
+void * sub_1_LRU_2_LOGIC(BigLRU * lru2) {
+	//LRU_2逻辑Part1
+	//读取原始数据不用通知LRU1
+	while (/*true*/!buffer_q_LRU_2.IsEmpty()/*buffer_index < SCALE*/) {
+        struct desc_item temp = *(buffer_q_LRU_2.WaitAndPop());
+		//struct desc_item temp = buffer[buffer_index];
+		int Flow_ID = temp.flow_id;
+		int ByteCnt = temp.byte_cnt;
 		int found = 0;
 		if ((found = lru2->find(Flow_ID)) != -1) {
 			lru2->insertFromOut(Flow_ID, ByteCnt, found);
 		}
 		else {
+			//LRU_1_notifications.Push(temp);
+			buffer_q_LRU_1.Push(temp);
+		}	
+    }
+	//cout << "LRU_2 EMPTY: " <<  buffer_q_LRU_2.IsEmpty() << endl;
+	return NULL;
+}
+
+void * sub_2_LRU_2_LOGIC(BigLRU * lru2) {
+	//LRU_2逻辑Part2
+	while (/*true*/!LRU_2_notifications.IsEmpty()) {
+		struct desc_item temp = *(LRU_2_notifications.WaitAndPop());
+		//insert new
+		int Flow_ID = temp.flow_id;
+		int ByteCnt = temp.byte_cnt;
+		lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
+	}
+	//cout << "LRU_2_notifications EMPTY: " <<  LRU_2_notifications.IsEmpty() << endl;
+    return NULL;
+}
+#endif
+
+void * sub_3_LRU_2_LOGIC(BigLRU * lru2) {
+	while (true) {
+		bool LRU_1_empty = buffer_q_LRU_1.IsEmpty();
+		bool LRU_2_empty = buffer_q_LRU_2.IsEmpty();
+		bool LRU_2_notifications_empty = LRU_2_notifications.IsEmpty();
+		if (!LRU_2_empty) {
+			//struct desc_item temp_LRU_1 = *(buffer_q_LRU_2.WaitAndPop());
+			struct desc_item temp = buffer_q_LRU_2.pop();
+			int Flow_ID = temp.flow_id;
+			int ByteCnt = temp.byte_cnt;
+			int found = 0;
+			if ((found = lru2->find(Flow_ID)) != -1) {
+				lru2->insertFromOut(Flow_ID, ByteCnt, found);
+			}
+			else {
+				buffer_q_LRU_1.Push(temp);
+			}
+		}
+		else if (!LRU_2_notifications_empty) {
+			struct desc_item temp_LRU_2_notifications = *(LRU_2_notifications.WaitAndPop());
+			//insert new
+			int Flow_ID = temp_LRU_2_notifications.flow_id;
+			int ByteCnt = temp_LRU_2_notifications.byte_cnt;
+			lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
+		}
+		else if (LRU_1_empty && LRU_2_empty && LRU_2_notifications_empty){
+			if (WRITE) {
+				//cout << "LRU_2 : " << buffer_q_LRU_1.IsEmpty() << " : " << buffer_q_LRU_2.IsEmpty() << " : " << LRU_2_notifications.IsEmpty() << endl;
+				lru2->writeAllToSRAM();
+				string str1 = "sram_estimate_value_";
+				string str3 = "0";
+				string str4 = ".txt";
+				lru2->sram->writeToFile(str1+str3+str4);
+			}
+			break;
+		}
+    }
+	//cout << "LRU_2 EMPTY: " <<  buffer_q_LRU_2.IsEmpty() << endl;
+	return NULL;
+}
+
+void * LRU_2_LOGIC () {
+	BigLRU * lru2 = biglru;
+    /*thread sub_1_thread_LRU_2_LOGIC(sub_1_LRU_2_LOGIC, lru2);
+    thread sub_2_thread_LRU_2_LOGIC(sub_2_LRU_2_LOGIC, lru2);
+	sub_1_thread_LRU_2_LOGIC.join();
+    sub_2_thread_LRU_2_LOGIC.join();*/
+	thread sub_3_thread_LRU_2_LOGIC(sub_3_LRU_2_LOGIC, lru2);
+	sub_3_thread_LRU_2_LOGIC.join();
+    return NULL;
+}
+
+void * LRU_1_LOGIC () {
+	SmallLRU * lru1 = smalllru;
+	while (true) {
+		bool LRU_1_empty = buffer_q_LRU_1.IsEmpty();
+		bool LRU_2_empty = buffer_q_LRU_2.IsEmpty();
+		bool LRU_2_notifications_empty = LRU_2_notifications.IsEmpty();
+
+		if (!LRU_1_empty) {
+			struct desc_item temp_LRU_1 = *(buffer_q_LRU_1.WaitAndPop());
+			int Flow_ID = temp_LRU_1.flow_id;
+			int ByteCnt = temp_LRU_1.byte_cnt;
+			int found = lru1->find(Flow_ID);
+			if (found != -1) {
+				int value = lru1->insertOld(Flow_ID, ByteCnt, found);
+				if (value != 0) {
+					LRU_2_notifications.Push(temp_LRU_1);
+				}
+			}
+			else {
+				lru1->insertNew(Flow_ID, ByteCnt);
+			}
+		}  
+		
+		//bool LRU_2_notifications_empty = LRU_2_notifications.IsEmpty();
+		else if (LRU_1_empty && LRU_2_empty && LRU_2_notifications_empty) {
+			if (WRITE) {
+				//cout << "LRU_1 : " << buffer_q_LRU_1.IsEmpty() << " : " << buffer_q_LRU_2.IsEmpty() << " : " << LRU_2_notifications.IsEmpty() << endl;
+				lru1->writeAllToDRAM();
+				string str2 = "dram_accurate_value_";
+				string str3 = "0";
+				string str4 = ".txt";
+				lru1->dram->writeToFile(str2+str3+str4);
+			}
+			break;
+		}
+    }
+	return NULL;
+}
+
+void * LRU_LOGIC () {  
+	//并行
+    thread thread_LRU_2_LOGIC(LRU_2_LOGIC);
+	thread thread_LRU_1_LOGIC(LRU_1_LOGIC);
+	thread_LRU_2_LOGIC.join();
+    thread_LRU_1_LOGIC.join();
+	cout << "total : " << buffer_q_LRU_1.IsEmpty() << " : " << buffer_q_LRU_2.IsEmpty() << " : " << LRU_2_notifications.IsEmpty() << endl;
+	//串行
+	/*SmallLRU * lru1 = smalllru;
+	BigLRU * lru2 = biglru;
+	int Flow_ID = 0, ByteCnt = 0;
+	for (long long i = 0;i < SCALE;i++) {
+		struct desc_item temp = *(buffer_q_LRU_2.WaitAndPop());
+		Flow_ID = temp.flow_id;
+		ByteCnt = temp.byte_cnt;
+		int found = 0;
+		if ((found = lru2->find(Flow_ID)) != -1) {
+			lru2->insertFromOut(Flow_ID, ByteCnt, found);
+		}
+		else {
+			//cout << Flow_ID  << " : " << lru1->LRU_SIZE << endl;
 			found = lru1->find(Flow_ID);
 			if (found != -1) {
 				int value = lru1->insertOld(Flow_ID, ByteCnt, found);
@@ -156,78 +239,45 @@ void * case_func(ThreadArg * arg) {
 				lru1->insertNew(Flow_ID, ByteCnt);
 			}
 		}
-	}
-
-	if (WRITE) {
-		lru1->writeAllToDRAM();
-		lru2->writeAllToSRAM();
-
-		string str1 = "sram_estimate_value_";
-		string str2 = "dram_accurate_value_";
-		string str3 = std::to_string(index);
-		string str4 = ".txt";
-		lru1->dram->writeToFile(str2+str3+str4);
-		lru2->sram->writeToFile(str1+str3+str4);
+	}*/
 	
-	}
-	return NULL;
+    return NULL;
 }
 
-struct Packet {
-public:
-	Packet(int id, int cnt) : Flow_id(id), ByteCnt(id) {};
-	Packet() :Flow_id(0), ByteCnt(0) {};
-	int Flow_id;
-	int ByteCnt;
-};
-
 int main() {
-
-	//struct desc_item buffer[SCALE];
-
-	//load file
+	//目前使用单线程进行读取
 	ifstream readFile("D:\\report_2013.txt");
 	string s = "";
 	int i = 0;
 	while (getline(readFile, s) && i < SCALE) {
 		struct desc_item entry(s);
 		buffer[i] = entry;
+		//buffer_q_LRU_2.Push(entry);
 		i++;
 	}
 	printf("ok\n");
 
-	thread threads[THREAD_NUM];
-	ThreadArg args[THREAD_NUM];
-	DWORD_PTR thread_mask[8];
-	thread_mask[0] = 0x01;
-	for (int i = 1;i < 8;i++) {
-		thread_mask[i] = thread_mask[i] * 2; 
-	}
-	for (int i = 0; i < THREAD_NUM; i++) {
-		smalllru[i] = new SmallLRU();
-		biglru[i] = new BigLRU();
-		smalllru[i]->init(16 * 1024, 0x3fff, 14);
-		biglru[i]->init(112 * 1024, 0xffff, 16);
-		int offset = (SCALE / THREAD_NUM) * i;
-		args[i].base = offset;
-		args[i].length = min(SCALE - offset, SCALE / THREAD_NUM);
-		threads[i] = thread(case_func, &args[i]);
-		SetThreadAffinityMask(threads[i].native_handle(),thread_mask[i%CORE_NUM]);
-	}
+	//init lru1, lru2
+	smalllru = new SmallLRU();
+	biglru = new BigLRU();
+	smalllru->init(16 * 1024, 0x3fff, 14);
+	biglru->init(112 * 1024, 0xffff, 16);
+	
+	thread thread_process_data(process_data);
+	thread thread_LRU_LOGIC(LRU_LOGIC);  
+	thread_process_data.join();
 
 	clock_t start, finish;
 	double totaltime;
-	start = clock();
-
-	for (int i = 0; i < THREAD_NUM; ++i) {
-		threads[i].join();
-	}
+	start = clock();  
+    thread_LRU_LOGIC.join();
 	finish = clock();
 	totaltime = (double)(finish - start) / CLOCKS_PER_SEC;
 
 	cout << totaltime << endl;
-	double speed = PACKET_MAX / totaltime / 1000 / 1000;
+	double speed = SCALE / totaltime / 1000 / 1000;
 	cout << speed << endl;
-
-	return 0;
+	delete[] smalllru;
+	delete[] biglru;
+    return 0;
 }

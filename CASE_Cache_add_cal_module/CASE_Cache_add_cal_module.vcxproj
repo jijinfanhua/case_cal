@@ -26,9 +26,11 @@
     <ClInclude Include="cal.h" />
     <ClInclude Include="DRAM.h" />
     <ClInclude Include="hash_entry.h" />
+    <ClInclude Include="Queue.h" />
     <ClInclude Include="set_associative.h" />
     <ClInclude Include="small_lru.h" />
     <ClInclude Include="SRAM.h" />
+    <ClInclude Include="thread_safe_queue.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{11B49EC1-79AB-4AE7-ACD8-8E0BF8BDB5C3}</ProjectGuid>

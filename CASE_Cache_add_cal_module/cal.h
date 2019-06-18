@@ -1,7 +1,7 @@
 #pragma once
 
 #include <iostream>
-#define COMPRESS 0
+#define COMPRESS 1
 
 typedef long int llint;
 
