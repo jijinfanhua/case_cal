@@ -1,9 +1,12 @@
 #pragma once
 
 #include <iostream>
+#include <map>
 #define COMPRESS 1
+#define PRINT_CAL 1
 
 typedef long int llint;
+using namespace std;
 
 class Calculate {
 private:
@@ -11,7 +14,11 @@ private:
 	double a_11;//scale 3
 	double a_12; //scale 2
 	double a_15; //scale 1		scale 0
-
+	map<llint, double> f_c_container;
+	map<double, double> inv_f_c_container;
+	map<double, double> renor_a1_a2_container;
+	map<double, llint> renor_a2_c1_container;
+	
 private:
 	// private functions
 	llint OEFUpdate(llint c, llint l, double a);
@@ -23,6 +30,7 @@ public:
 	void init();
 	void update(llint *symb_value, int ByteCnt, int *scale_value);
 	llint backToRealValue(llint symb_value, int scale);
+	void write_cal_to_file();
 };
 
 // init 4 compression parameter
@@ -109,11 +117,13 @@ llint Calculate::OEFUpdate(llint c, llint l, double a) {
 }
 
 double Calculate::FC_OEF(llint c, double a) {
+	f_c_container.insert(make_pair(c, a));
 	double x = (pow((1 + a), (double)c) - 1) / a*(2 + a) / 2;
 	return x;
 }
 
 double Calculate::INV_FC_OEF(double n, double a) {
+	inv_f_c_container.insert(make_pair(n, a));
 	double temp_1 = log(2 * a*n + 2 + a) - log(2 + a);
 	double temp_2 = log(1 + a);
 	double x = temp_1 / temp_2;
@@ -121,6 +131,8 @@ double Calculate::INV_FC_OEF(double n, double a) {
 }
 
 llint Calculate::OEF_renor(double a1, double a2, llint c1) {
+	renor_a1_a2_container.insert(make_pair(a1, a2));
+	renor_a2_c1_container.insert(make_pair(a2, c1));
 	double v = (double)(rand() / (double)RAND_MAX);//generate a random number 0<x<1
 	llint c2;
 	double c2_temp;
@@ -135,4 +147,46 @@ llint Calculate::OEF_renor(double a1, double a2, llint c1) {
 		c2 = (llint)c2_temp;
 	}
 	return c2;
+}
+
+void Calculate::write_cal_to_file() {
+	/* write f_c table */
+	FILE * fp = fopen("f_c.txt", "w");
+	map<llint, double>::iterator it1;
+	it1 = f_c_container.begin();
+	while (it1 != f_c_container.end()) {
+		fprintf(fp, "%lld\t%lf\n", it1->first, it1->second);
+		it1++;
+	}
+	fclose(fp);
+
+	/* write inverse f_c table */
+	fp = fopen("inv_f_c.txt", "w");
+	map<double, double>::iterator it2;
+	it2 = inv_f_c_container.begin();
+	while (it2 != inv_f_c_container.end()) {
+		fprintf(fp, "%lf\t%lf\n", it2->first, it2->second);
+		it2++;
+	}
+	fclose(fp);
+
+	/* write renor a1_a2 table */
+	fp = fopen("renor_a1_a2.txt", "w");
+	map<double, double>::iterator it3;
+	it3 = renor_a1_a2_container.begin();
+	while (it3 != renor_a1_a2_container.end()) {
+		fprintf(fp, "%lf\t%lf\n", it3->first, it3->second);
+		it3++;
+	}
+	fclose(fp);
+
+	/* write renor a1_a2 table */
+	fp = fopen("renor_a2_c1.txt", "w");
+	map<double, llint>::iterator it4;
+	it4 = renor_a2_c1_container.begin();
+	while (it4 != renor_a2_c1_container.end()) {
+		fprintf(fp, "%lf\t%lf\n", it4->first, it4->second);
+		it4++;
+	}
+	fclose(fp);
 }

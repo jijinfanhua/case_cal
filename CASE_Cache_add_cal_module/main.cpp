@@ -117,6 +117,10 @@ void * LRU_2_LOGIC (LRU_Thread_Arg * arg) {
 		string str4 = ".txt";
 		lru2->sram->writeToFile(str1+str3+str4);
 	}
+#if PRINT_CAL
+	lru2->sram->cal_table_write_to_file();
+	lru2->sram->write_count_to_file();
+#endif
     return NULL;
 }
 
@@ -154,6 +158,9 @@ void * LRU_1_LOGIC (LRU_Thread_Arg * arg) {
 		string str4 = ".txt";
 		lru1->dram->writeToFile(str2+str3+str4);
 	}
+#if PRINT_CAL
+	lru1->dram->write_count_to_file();
+#endif
 	return NULL;
 }
 

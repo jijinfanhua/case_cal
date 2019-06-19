@@ -47,6 +47,7 @@ void SmallLRU::init(int lru_size, int m, int hash_size) {
 
 
 	dram = new DRAM();
+	dram->init();
 
 	head = new CacheSet();
 	tail = new CacheSet();

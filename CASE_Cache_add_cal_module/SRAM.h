@@ -36,11 +36,21 @@ public:
 	void init();
 	void writeToFile(string filename);
 	long backToRealValue(llint symb, int scale);
+	void cal_table_write_to_file();
+	void write_count_to_file();
+	long write_to_sram_count_new;
+	long write_to_sram_count_old;
 };
 
 void SRAM::init() {
 	cal = new Calculate();
 	cal->init();
+	write_to_sram_count_new = 0;
+	write_to_sram_count_old = 0;
+}
+
+void SRAM::cal_table_write_to_file() {
+	cal->write_cal_to_file();
 }
 
 void SRAM::insert(int FlowId, int ByteCnt) {
@@ -52,6 +62,7 @@ void SRAM::insert(int FlowId, int ByteCnt) {
 
 	if (it == container.end()) {
 		cal->update(&symb, ByteCnt, &scale);
+		write_to_sram_count_new += 1;
 		container.insert(make_pair(FlowId, S_element(symb, scale)));
 	}
 	else {
@@ -62,6 +73,7 @@ void SRAM::insert(int FlowId, int ByteCnt) {
 		container.erase(it);
 		
 		cal->update(&symb, ByteCnt, &scale);
+		write_to_sram_count_old += 1;
 		container.insert(make_pair(FlowId, S_element(symb, scale)));
 	}
 }
@@ -87,6 +99,13 @@ void SRAM::writeToFile(string filename) {
 		fprintf(fp, "%d\t%lld\n", it->first, esti_value);
 		it++;
 	}
+	fclose(fp);
+}
+
+void SRAM::write_count_to_file() {
+	FILE * fp = fopen("sram_count.txt", "w");
+	fprintf(fp, "insert new: %ld\n", write_to_sram_count_new);
+	fprintf(fp, "insert old: %ld\n", write_to_sram_count_old);
 	fclose(fp);
 }
 
