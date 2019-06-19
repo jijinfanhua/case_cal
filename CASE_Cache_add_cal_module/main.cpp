@@ -13,10 +13,10 @@
 #include "small_lru.h"
 #include "Safe_Queue.h"
 
-#define THREAD_NUM 1
+#define THREAD_NUM 8
 #define CORE_NUM 4
 
-#define SCALE 2500000
+#define SCALE 10000000
 
 #define WRITE 0
 #define WRITE_TIMES 1
@@ -61,10 +61,6 @@ QUEUE_DATA<desc_item> * LRU_2_notifications[THREAD_NUM];
 
 typedef struct LRU_Thread_Arg {
 	int LRU_index;
-	//QUEUE_DATA<struct desc_item> * buffer_q_LRU_1;
-	//QUEUE_DATA<struct desc_item> * buffer_q_LRU_2;
-	//从LRU_1来的新大流数据
-	//QUEUE_DATA<struct desc_item> * LRU_2_notifications;
 }LRU_Thread_Arg;
 
 /*void * process_data () {
@@ -76,11 +72,16 @@ typedef struct LRU_Thread_Arg {
     return NULL;
 }*/
 
+/*
+int LRU_1_max_length = 0;
+int LRU_2_notifications_max_length = 0;
+*/
+
 void * LRU_2_LOGIC (LRU_Thread_Arg * arg) {
 	BigLRU * lru2 = biglru[arg->LRU_index];
 	int i = 0;
 	//如果要写文件要保证运行足够长的时间
-	cout << SCALE/THREAD_NUM*WRITE_TIMES << endl;
+	//cout << SCALE/THREAD_NUM*WRITE_TIMES << endl;
 	while (true && i < SCALE/THREAD_NUM*WRITE_TIMES) {
 		i ++;
 		struct desc_item temp_LRU_2;
@@ -96,6 +97,9 @@ void * LRU_2_LOGIC (LRU_Thread_Arg * arg) {
 			}
 			else {
 				buffer_q_LRU_1[arg->LRU_index]->push_data(temp_LRU_2);
+				/*int length = buffer_q_LRU_1[arg->LRU_index]->queue_size();
+				if (length > LRU_1_max_length)
+					LRU_1_max_length = length;*/
 			}
 		}
 		if (flag_LRU_2_notifications == 0) {
@@ -105,6 +109,7 @@ void * LRU_2_LOGIC (LRU_Thread_Arg * arg) {
 			lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
 		}
     }
+	//cout << "buffer_q_LRU_1 : " << LRU_1_max_length << endl;
 	if (WRITE) {
 		lru2->writeAllToSRAM();
 		string str1 = "sram_estimate_value_";
@@ -131,6 +136,9 @@ void * LRU_1_LOGIC (LRU_Thread_Arg * arg) {
 				if (value != 0) {
 					temp_LRU_1.byte_cnt = value;
 					LRU_2_notifications[arg->LRU_index]->push_data(temp_LRU_1);
+					/*int length = LRU_2_notifications[arg->LRU_index]->queue_size();
+					if (length > LRU_2_notifications_max_length)
+						LRU_2_notifications_max_length = length;*/
 				}
 			}
 			else {
@@ -138,6 +146,7 @@ void * LRU_1_LOGIC (LRU_Thread_Arg * arg) {
 			}
 		}  
     }
+	//cout << "LRU_2_notifications_max_length : " << LRU_2_notifications_max_length << endl;
 	if (WRITE) {
 		lru1->writeAllToDRAM();
 		string str2 = "dram_accurate_value_";
@@ -167,9 +176,9 @@ int main() {
 	}
 	for (int i = 0;i < THREAD_NUM;i++) {
 		LRU_args[i].LRU_index = i;
-		buffer_q_LRU_1[i] = new QUEUE_DATA<desc_item>();
-		buffer_q_LRU_2[i] = new QUEUE_DATA<desc_item>();
-		LRU_2_notifications[i] = new QUEUE_DATA<desc_item>();
+		buffer_q_LRU_1[i] = new QUEUE_DATA<desc_item>(SCALE/2);
+		buffer_q_LRU_2[i] = new QUEUE_DATA<desc_item>(SCALE);
+		LRU_2_notifications[i] = new QUEUE_DATA<desc_item>(SCALE/10000);
 		smalllru[i] = new SmallLRU();
 		biglru[i] = new BigLRU();
 		smalllru[i]->init(16 * 1024, 0x3fff, 14);
@@ -188,6 +197,7 @@ int main() {
 	printf("ok\n");
 	
 	for (int i = 0;i < THREAD_NUM;i++) {
+		//cout << i << " : " << buffer_q_LRU_2[i]->queue_size() << endl;
 		LRU_threads[i] =  thread(LRU_LOGIC, &LRU_args[i]);
 		//SetThreadAffinityMask(LRU_threads[i].native_handle(),thread_mask[i%CORE_NUM]);
 	}
@@ -207,7 +217,13 @@ int main() {
 	cout << totaltime << endl;
 	double speed = SCALE / totaltime / 1000 / 1000;
 	cout << speed << endl;
-	//delete[] smalllru;
-	//delete[] biglru;
+
+	for (int i = 0;i < THREAD_NUM;i++) {
+		delete smalllru[i];
+		delete biglru[i];
+		delete buffer_q_LRU_1[i];
+		delete buffer_q_LRU_2[i];
+		delete LRU_2_notifications[i];
+	}
     return 0;
 }

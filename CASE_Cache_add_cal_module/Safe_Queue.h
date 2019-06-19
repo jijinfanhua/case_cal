@@ -8,22 +8,34 @@
 template<class T>
 class QUEUE_DATA {
 private:
-    T data[MAX_NUMBER];
+    //T data[MAX_NUMBER];
+	T* data;
     int head;
     int tail;
+	int max_length;
 public:
     QUEUE_DATA() {
         this->head = 0;
         this->tail = 0;
+		this->max_length = MAX_NUMBER;
+		this->data = new T[max_length];
     }
-    ~QUEUE_DATA() {}
+	QUEUE_DATA(long queue_size) {
+		this->head = 0;
+        this->tail = 0;
+		this->max_length = queue_size;
+		this->data = new T[queue_size];
+	}
+    ~QUEUE_DATA() {
+		delete[] this->data;
+	}
 
     int push_data(T data) {
-        if(this->head == ((this->tail) + 1)% MAX_NUMBER)
+        if(this->head == ((this->tail) + 1)% this->max_length)
             return NOTOK;
 
         this->data[this->tail] = data;
-        this->tail = (this->tail + 1)% MAX_NUMBER;
+        this->tail = (this->tail + 1)% this->max_length;
         return OK;
     }
 
@@ -37,9 +49,13 @@ public:
             
 
         *pData = this->data[this->head];
-        this->head = (this->head + 1)% MAX_NUMBER;
+        this->head = (this->head + 1)% this->max_length;
         return OK;
     }
+
+	int queue_size() {
+		return this->tail - this->head;
+	}
 
 };
 #endif // SAFE_QUEUE
