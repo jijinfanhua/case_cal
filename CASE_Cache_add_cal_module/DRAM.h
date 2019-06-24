@@ -25,14 +25,18 @@ public:
 	int find(int FlowId);
 	void writeToFile(string filename);
 	void init();
+#ifdef PRINT_CAL
 	void write_count_to_file();
 	long write_to_dram_count_new;
 	long write_to_dram_count_old;
+#endif
 };
 
 void DRAM::init() {
+#ifdef PRINT_CAL
 	write_to_dram_count_new = 0;
 	write_to_dram_count_old = 0;
+#endif
 }
 
 void DRAM::insert(int FlowId, int ByteCnt) {
@@ -40,13 +44,17 @@ void DRAM::insert(int FlowId, int ByteCnt) {
 	map<int, int>::iterator it;
 	it = container.find(FlowId);
 	if (it == container.end()) {
+#ifdef PRINT_CAL
 		write_to_dram_count_new += 1;
+#endif
 		container.insert(make_pair(FlowId, ByteCnt));
 	}
 	else {
 		int temp = it->second;
 		container.erase(it);
+#ifdef PRINT_CAL
 		write_to_dram_count_old += 1;
+#endif
 		container.insert(make_pair(FlowId, ByteCnt + temp));
 	}
 }
@@ -74,12 +82,14 @@ void DRAM::writeToFile(string filename) {
 	fclose(fp);
 }
 
+#ifdef PRINT_CAL
 void DRAM::write_count_to_file() {
 	FILE * fp = fopen("dram_count.txt", "w");
 	fprintf(fp, "insert new: %ld\n", write_to_dram_count_new);
 	fprintf(fp, "insert old: %ld\n", write_to_dram_count_old);
 	fclose(fp);
 }
+#endif
 
 int DRAM::count() {
 	return container.size();

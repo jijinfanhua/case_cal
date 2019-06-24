@@ -124,6 +124,7 @@ void * LRU_2_LOGIC (LRU_Thread_Arg * arg) {
 #if PRINT_CAL
 	lru2->sram->cal_table_write_to_file();
 	lru2->sram->write_count_to_file();
+	lru2->sram->off_cal_file();
 #endif
     return NULL;
 }

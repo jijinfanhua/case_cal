@@ -162,6 +162,9 @@ int BigLRU::insertFromSmallLRU(int Flow_ID, int ByteCnt) {
 	//1. 如果LRU2没有满，则直接放在lru_index，调整相应的数值；
 	//2. 如果LRU2已经满了，也是放
 
+
+	vector<int> a;
+
 	int hash_id = Flow_ID & mask;
 
 	if (hashtable[hash_id]->cache_loc == DEFAULT) {

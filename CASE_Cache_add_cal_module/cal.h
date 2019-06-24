@@ -14,10 +14,15 @@ private:
 	double a_11;//scale 3
 	double a_12; //scale 2
 	double a_15; //scale 1		scale 0
+
+#ifdef PRINT_CAL
 	map<llint, double> f_c_container;
 	map<double, double> inv_f_c_container;
 	map<double, double> renor_a1_a2_container;
 	map<double, llint> renor_a2_c1_container;
+	FILE * oefupdate_fp;
+	FILE * update_fp;
+#endif
 	
 private:
 	// private functions
@@ -30,7 +35,10 @@ public:
 	void init();
 	void update(llint *symb_value, int ByteCnt, int *scale_value);
 	llint backToRealValue(llint symb_value, int scale);
+#ifdef PRINT_CAL
+	void off_file();
 	void write_cal_to_file();
+#endif
 };
 
 // init 4 compression parameter
@@ -39,6 +47,9 @@ void Calculate::init() {
 	a_11 = pow(0.5, 11.730474);
 	a_12 = pow(0.5, 12.0);
 	a_15 = pow(0.5, 15.0);
+#ifdef PRINT_CAL
+	oefupdate_fp = fopen("oefupdate.txt", "w");
+#endif
 }
 
 llint Calculate::backToRealValue(llint symb_value, int scale) {
@@ -67,6 +78,9 @@ llint Calculate::backToRealValue(llint symb_value, int scale) {
 }
 
 void Calculate::update(llint *symb_value, int ByteCnt, int *scale_value) {
+#ifdef PRINT_CAL
+	fprintf(update_fp, "%lld\t%d\t%d\n", *symb_value, ByteCnt, *scale_value);
+#endif
 #ifdef COMPRESS
 	if (*scale_value == 0) {
 		*symb_value += ByteCnt;
@@ -95,6 +109,7 @@ void Calculate::update(llint *symb_value, int ByteCnt, int *scale_value) {
 	{
 		*symb_value += OEFUpdate(*symb_value, (llint)ByteCnt, a_11);
 	}
+	fprintf(update_fp, "%lld\t%d\n", *symb_value, *scale_value);
 	return;
 #else
 	*symb_value += ByteCnt;
@@ -103,6 +118,7 @@ void Calculate::update(llint *symb_value, int ByteCnt, int *scale_value) {
 }
 
 llint Calculate::OEFUpdate(llint c, llint l, double a) {
+	fprintf(oefupdate_fp, "%lld\t%lld\t%.10lf\n", c, l, a);
 	double v = (double)(rand() / (double)RAND_MAX);
 
 	double f_c = FC_OEF(c, a);//f(c)
@@ -121,13 +137,17 @@ llint Calculate::OEFUpdate(llint c, llint l, double a) {
 }
 
 double Calculate::FC_OEF(llint c, double a) {
+#ifdef PRINT_CAL
 	f_c_container.insert(make_pair(c, a));
+#endif
 	double x = (pow((1 + a), (double)c) - 1) / a*(2 + a) / 2;
 	return x;
 }
 
 double Calculate::INV_FC_OEF(double n, double a) {
+#ifdef PRINT_CAL
 	inv_f_c_container.insert(make_pair(n, a));
+#endif
 	double temp_1 = log(2 * a*n + 2 + a) - log(2 + a);
 	double temp_2 = log(1 + a);
 	double x = temp_1 / temp_2;
@@ -135,8 +155,10 @@ double Calculate::INV_FC_OEF(double n, double a) {
 }
 
 llint Calculate::OEF_renor(double a1, double a2, llint c1) {
+#ifdef PRINT_CAL
 	renor_a1_a2_container.insert(make_pair(a1, a2));
 	renor_a2_c1_container.insert(make_pair(a2, c1));
+#endif
 	double v = (double)(rand() / (double)RAND_MAX);//generate a random number 0<x<1
 	llint c2;
 	double c2_temp;
@@ -153,6 +175,7 @@ llint Calculate::OEF_renor(double a1, double a2, llint c1) {
 	return c2;
 }
 
+#ifdef PRINT_CAL
 void Calculate::write_cal_to_file() {
 	/* write f_c table */
 	FILE * fp = fopen("f_c.txt", "w");
@@ -194,3 +217,11 @@ void Calculate::write_cal_to_file() {
 	}
 	fclose(fp);
 }
+#endif
+
+#ifdef PRINT_CAL
+void Calculate::off_file() {
+	fclose(oefupdate_fp);
+	fclose(update_fp);
+}
+#endif
