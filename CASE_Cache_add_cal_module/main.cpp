@@ -8,18 +8,19 @@
 #include <sstream>
 #include <fstream>
 #include <Windows.h>
+#include <time.h>
 
 #include "big_lru.h"
 #include "small_lru.h"
 #include "Safe_Queue.h"
 
-#define THREAD_NUM 8
+#define THREAD_NUM 1
 #define CORE_NUM 4
 
 #define SCALE 10000000
 
 #define WRITE 0
-#define WRITE_TIMES 1
+#define WRITE_TIMES 18
 
 using namespace std;
 
@@ -57,7 +58,7 @@ struct desc_item {
 
 QUEUE_DATA<desc_item> * buffer_q_LRU_1[THREAD_NUM];
 QUEUE_DATA<desc_item> * buffer_q_LRU_2[THREAD_NUM];
-QUEUE_DATA<desc_item> * LRU_2_notifications[THREAD_NUM];
+QUEUE_DATA<desc_item> * LRU_1_notification[THREAD_NUM];
 
 typedef struct LRU_Thread_Arg {
 	int LRU_index;
@@ -79,36 +80,37 @@ int LRU_2_notifications_max_length = 0;
 
 void * LRU_2_LOGIC (LRU_Thread_Arg * arg) {
 	BigLRU * lru2 = biglru[arg->LRU_index];
-	int i = 0;
+	long long i = 0;
+	struct desc_item temp_LRU_2;
+	int flag_LRU_2 = 0;
+	int Flow_ID = 0;
+	int ByteCnt = 0;
+	int found = 0;
 	//如果要写文件要保证运行足够长的时间
 	//cout << SCALE/THREAD_NUM*WRITE_TIMES << endl;
 	while (true && i < SCALE/THREAD_NUM*WRITE_TIMES) {
 		i ++;
-		struct desc_item temp_LRU_2;
-		int flag_LRU_2 = buffer_q_LRU_2[arg->LRU_index]->pop_data(&temp_LRU_2);
-		struct desc_item temp_LRU_2_notifications;
-		int flag_LRU_2_notifications = LRU_2_notifications[arg->LRU_index]->pop_data(&temp_LRU_2_notifications);
+		flag_LRU_2 = buffer_q_LRU_2[arg->LRU_index]->pop_data(&temp_LRU_2);
 		if (flag_LRU_2 == 0) {
-			int Flow_ID = temp_LRU_2.flow_id;
-			int ByteCnt = temp_LRU_2.byte_cnt;
-			int found = 0;
-			if ((found = lru2->find(Flow_ID)) != -1) {
-				lru2->insertFromOut(Flow_ID, ByteCnt, found);
+			Flow_ID = temp_LRU_2.flow_id;
+			ByteCnt = temp_LRU_2.byte_cnt;
+			if (ByteCnt > SMALL_BYTE_THRES) {
+				lru2->insertFromSmallLRU(Flow_ID, ByteCnt);	
 			}
 			else {
-				buffer_q_LRU_1[arg->LRU_index]->push_data(temp_LRU_2);
-				/*int length = buffer_q_LRU_1[arg->LRU_index]->queue_size();
-				if (length > LRU_1_max_length)
-					LRU_1_max_length = length;*/
+				if ((found = lru2->find(Flow_ID)) != -1) {
+					lru2->insertFromOut(Flow_ID, ByteCnt, found);
+				}
+				else {
+					LRU_1_notification[arg->LRU_index]->push_data(temp_LRU_2);
+					/*int length = buffer_q_LRU_1[arg->LRU_index]->queue_size();
+					if (length > LRU_1_max_length)
+						LRU_1_max_length = length;*/
+				}
 			}
 		}
-		if (flag_LRU_2_notifications == 0) {
-			//insert new
-			int Flow_ID = temp_LRU_2_notifications.flow_id;
-			int ByteCnt = temp_LRU_2_notifications.byte_cnt;
-			lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
-		}
     }
+	cout << "LRU_2_LOGIC_end : " << GetCurrentTime() << endl;
 	//cout << "buffer_q_LRU_1 : " << LRU_1_max_length << endl;
 	if (WRITE) {
 		lru2->writeAllToSRAM();
@@ -117,6 +119,8 @@ void * LRU_2_LOGIC (LRU_Thread_Arg * arg) {
 		string str4 = ".txt";
 		lru2->sram->writeToFile(str1+str3+str4);
 	}
+
+//cout << PRINT_CAL << endl;
 #if PRINT_CAL
 	lru2->sram->cal_table_write_to_file();
 	lru2->sram->write_count_to_file();
@@ -124,33 +128,57 @@ void * LRU_2_LOGIC (LRU_Thread_Arg * arg) {
     return NULL;
 }
 
+int LRU_1_index = 0;
+clock_t LRU_1_start, LRU_1_finish;
+
 void * LRU_1_LOGIC (LRU_Thread_Arg * arg) {
 	SmallLRU * lru1 = smalllru[arg->LRU_index];
-	int i = 0;
+	long long i = 0;
+	struct desc_item temp_LRU_1;
+	int flag_LRU_1 = 0;
+	int flag_LRU_1_notification = 0;
+	int Flow_ID = 0;
+	int ByteCnt = 0;
+	int found = 0;
+	int value = 0;
 	while (true && i < SCALE/THREAD_NUM*WRITE_TIMES) {
 		i++;
-		struct desc_item temp_LRU_1;
-		int flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
+		flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
 		if (flag_LRU_1 == 0) {
-			int Flow_ID = temp_LRU_1.flow_id;
-			int ByteCnt = temp_LRU_1.byte_cnt;
-			int found = lru1->find(Flow_ID);
+			LRU_1_index ++;
+			if (LRU_1_index == 5000000-1) {
+				LRU_1_start = clock();
+			}
+			if (LRU_1_index == 15000000-1) {
+				LRU_1_finish = clock();
+			}
+			Flow_ID = temp_LRU_1.flow_id;
+			ByteCnt = temp_LRU_1.byte_cnt;
+			found = lru1->find(Flow_ID);
 			if (found != -1) {
-				int value = lru1->insertOld(Flow_ID, ByteCnt, found);
+				value = lru1->insertOld(Flow_ID, ByteCnt, found);
 				if (value != 0) {
 					temp_LRU_1.byte_cnt = value;
-					LRU_2_notifications[arg->LRU_index]->push_data(temp_LRU_1);
+					buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
 					/*int length = LRU_2_notifications[arg->LRU_index]->queue_size();
 					if (length > LRU_2_notifications_max_length)
 						LRU_2_notifications_max_length = length;*/
 				}
 			}
 			else {
-				lru1->insertNew(Flow_ID, ByteCnt);
+				buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
+				//lru1->insertNew(Flow_ID, ByteCnt);
 			}
-		}  
+		}
+		flag_LRU_1_notification = LRU_1_notification[arg->LRU_index]->pop_data(&temp_LRU_1);
+		if (flag_LRU_1_notification == 0) {
+			Flow_ID = temp_LRU_1.flow_id;
+			ByteCnt = temp_LRU_1.byte_cnt;
+			lru1->insertNew(Flow_ID, ByteCnt);
+		}
     }
 	//cout << "LRU_2_notifications_max_length : " << LRU_2_notifications_max_length << endl;
+	cout << "LRU_1_LOGIC_end : " << GetCurrentTime() << endl;
 	if (WRITE) {
 		lru1->writeAllToDRAM();
 		string str2 = "dram_accurate_value_";
@@ -166,10 +194,10 @@ void * LRU_1_LOGIC (LRU_Thread_Arg * arg) {
 
 void * LRU_LOGIC (LRU_Thread_Arg * arg) {  
 	//并行
-    thread thread_LRU_2_LOGIC(LRU_2_LOGIC, arg);
 	thread thread_LRU_1_LOGIC(LRU_1_LOGIC, arg);
-	thread_LRU_2_LOGIC.join();
+    thread thread_LRU_2_LOGIC(LRU_2_LOGIC, arg);
 	thread_LRU_1_LOGIC.join();
+	thread_LRU_2_LOGIC.join();	
     return NULL;
 }
 
@@ -183,9 +211,9 @@ int main() {
 	}
 	for (int i = 0;i < THREAD_NUM;i++) {
 		LRU_args[i].LRU_index = i;
-		buffer_q_LRU_1[i] = new QUEUE_DATA<desc_item>(SCALE/2);
+		buffer_q_LRU_1[i] = new QUEUE_DATA<desc_item>(SCALE);
 		buffer_q_LRU_2[i] = new QUEUE_DATA<desc_item>(SCALE);
-		LRU_2_notifications[i] = new QUEUE_DATA<desc_item>(SCALE/10000);
+		LRU_1_notification[i] = new QUEUE_DATA<desc_item>(SCALE/*/10000*/);
 		smalllru[i] = new SmallLRU();
 		biglru[i] = new BigLRU();
 		smalllru[i]->init(16 * 1024, 0x3fff, 14);
@@ -198,7 +226,7 @@ int main() {
 	while (getline(readFile, s) && i < SCALE) {
 		struct desc_item entry(s);
 		//cout << i%THREAD_NUM << endl;
-		buffer_q_LRU_2[i%THREAD_NUM]->push_data(entry);
+		buffer_q_LRU_1[i%THREAD_NUM]->push_data(entry);
 		i++;
 	}
 	printf("ok\n");
@@ -224,13 +252,18 @@ int main() {
 	cout << totaltime << endl;
 	double speed = SCALE / totaltime / 1000 / 1000;
 	cout << speed << endl;
+	cout << "LRU_2_index : " << LRU_1_index << endl;
+	double totaltime_new = (double)(LRU_1_finish - LRU_1_start) / CLOCKS_PER_SEC;
+	double speed_new = SCALE /2 / totaltime_new / 1000 /1000;
+	cout << "totaltime_new : " << totaltime_new << endl;
+	cout << "speed_new : " << speed_new << endl;
 
 	for (int i = 0;i < THREAD_NUM;i++) {
 		delete smalllru[i];
 		delete biglru[i];
 		delete buffer_q_LRU_1[i];
 		delete buffer_q_LRU_2[i];
-		delete LRU_2_notifications[i];
+		delete LRU_1_notification[i];
 	}
     return 0;
 }

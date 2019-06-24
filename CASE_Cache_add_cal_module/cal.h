@@ -42,8 +42,7 @@ void Calculate::init() {
 }
 
 llint Calculate::backToRealValue(llint symb_value, int scale) {
-	if(!COMPRESS)
-		return symb_value;
+#ifdef COMPRESS
 	llint esti_value;
 	if (scale == 0)
 	{
@@ -62,13 +61,13 @@ llint Calculate::backToRealValue(llint symb_value, int scale) {
 		esti_value = FC_OEF(symb_value, a_11);
 	}
 	return esti_value;
+#else
+	return symb_value;
+#endif
 }
 
 void Calculate::update(llint *symb_value, int ByteCnt, int *scale_value) {
-	if(!COMPRESS) {
-		*symb_value += ByteCnt;
-		return;
-	}	
+#ifdef COMPRESS
 	if (*scale_value == 0) {
 		*symb_value += ByteCnt;
 		if (*symb_value > 65535) {
@@ -96,6 +95,11 @@ void Calculate::update(llint *symb_value, int ByteCnt, int *scale_value) {
 	{
 		*symb_value += OEFUpdate(*symb_value, (llint)ByteCnt, a_11);
 	}
+	return;
+#else
+	*symb_value += ByteCnt;
+	return;
+#endif
 }
 
 llint Calculate::OEFUpdate(llint c, llint l, double a) {

@@ -26,6 +26,14 @@ public:
 		this->max_length = queue_size;
 		this->data = new T[queue_size];
 	}
+	//具有指针成员必须写拷贝构造函数，避免野指针
+	QUEUE_DATA(const QUEUE_DATA &queue_data) {
+		this->head = queue_data->head;
+        this->tail = queue_data->tail;
+		this->max_length = queue_data->max_length;
+		this->data = new T[max_length];
+		memcpy(this->data, queue_data->data,queue_data->max_length*sizeof(T));
+	}
     ~QUEUE_DATA() {
 		delete[] this->data;
 	}

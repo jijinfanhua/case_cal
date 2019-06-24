@@ -36,6 +36,7 @@ void DRAM::init() {
 }
 
 void DRAM::insert(int FlowId, int ByteCnt) {
+	//return;
 	map<int, int>::iterator it;
 	it = container.find(FlowId);
 	if (it == container.end()) {
