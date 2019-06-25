@@ -11,6 +11,7 @@
 #define set_associative_h
 
 #include <immintrin.h>
+#include "cal.h"
 
 #define DEFAULT_POINTER -2
 #define DEFAULT_LOC -1
@@ -22,7 +23,7 @@ class CacheSet {
 public:
 	//CacheSet(int previous, int next):_previous(previous), _next(next){};
 	__m128i flow_id;
-	unsigned int counter[4];
+	case_bytecnt_t counter[4];
 	int usage[4];
 	int ctr;
 	int _previous;

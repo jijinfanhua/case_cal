@@ -17,25 +17,25 @@ using namespace std;
 
 typedef struct S_element {
 public:
-	llint symb_value;
+	case_symb_t symb_value;
 	int scale;
 	S_element() {}
-	S_element(llint symb, int sca) :symb_value(symb), scale(sca) {}
-};
+	S_element(case_symb_t symb, int sca) :symb_value(symb), scale(sca) {}
+}S_element;
 
 class SRAM {
 private:
-	map<int, S_element> container;
+	map<case_flowid_t, S_element> container;
 	Calculate *cal;
 
 public:
-	void insert(int FlowId, int ByteCnt);
-	int count();
-	void del_element(int FlowId);
-	long find(int FlowId);
+	void insert(case_flowid_t FlowId, case_bytecnt_t ByteCnt);
+	size_t count();
+	void del_element(case_flowid_t FlowId);
+	case_symb_t find(case_flowid_t FlowId);
 	void init();
 	void writeToFile(string filename);
-	long backToRealValue(llint symb, int scale);
+	//case_symb_t backToRealValue(case_symb_t symb, int scale);
 #ifdef PRINT_CAL
 	void cal_table_write_to_file();
 	void write_count_to_file();
@@ -60,12 +60,12 @@ void SRAM::cal_table_write_to_file() {
 }
 #endif
 
-void SRAM::insert(int FlowId, int ByteCnt) {
-	map<int, S_element>::iterator it;
+void SRAM::insert(case_flowid_t FlowId, case_bytecnt_t ByteCnt) {
+	map<case_flowid_t, S_element>::iterator it;
 	it = container.find(FlowId);
 
 	int scale = 0;
-	llint symb = 0;
+	case_symb_t symb = 0;
 
 	if (it == container.end()) {
 		cal->update(&symb, ByteCnt, &scale);
@@ -89,8 +89,8 @@ void SRAM::insert(int FlowId, int ByteCnt) {
 	}
 }
 
-long SRAM::find(int FlowId) {
-	map<int, S_element>::iterator it;
+case_symb_t SRAM::find(case_flowid_t FlowId) {
+	map<case_flowid_t, S_element>::iterator it;
 	it = container.find(FlowId);
 	if (it == container.end()) {
 		return -1;
@@ -102,14 +102,25 @@ long SRAM::find(int FlowId) {
 
 void SRAM::writeToFile(string filename) {
 	FILE * fp = fopen(filename.c_str(), "w");
-	map<int, S_element>::iterator it;
+	map<case_flowid_t, S_element>::iterator it;
 	it = container.begin();
-	llint esti_value;
+#ifdef COMPRESS
+	double esti_value;
+	case_symb_t temp;
 	while (it != container.end()) {
 		esti_value = cal->backToRealValue(it->second.symb_value, it->second.scale);
-		fprintf(fp, "%d\t%lld\n", it->first, esti_value);
+		temp = (case_symb_t)(((esti_value - double(floor(esti_value))) > 0.5) ? ceil(esti_value) : floor(esti_value));
+		fprintf(fp, "%d\t%lu\n", it->first, temp);
 		it++;
 	}
+#else
+	case_symb_t esti_value;
+	while (it != container.end()) {
+		esti_value = cal->backToRealValue(it->second.symb_value, it->second.scale);
+		fprintf(fp, "%d\t%lu\n", it->first, esti_value);
+		it++;
+	}
+#endif
 	fclose(fp);
 }
 
@@ -128,11 +139,11 @@ void SRAM::off_cal_file() {
 }
 #endif
 
-int SRAM::count() {
+size_t SRAM::count() {
 	return container.size();
 }
 
-void SRAM::del_element(int FlowId) {
+void SRAM::del_element(case_flowid_t FlowId) {
 
 }
 

@@ -11,18 +11,19 @@
 
 #include <queue>
 #include <map>
+#include "cal.h"
 
 using namespace std;
 
 class DRAM {
 private:
-	map<int, int> container;
+	map<case_flowid_t, case_symb_t> container;
 
 public:
-	void insert(int FlowId, int ByteCnt);
-	int count();
-	void del_element(int FlowId);
-	int find(int FlowId);
+	void insert(case_flowid_t FlowId, case_bytecnt_t ByteCnt);
+	size_t count();
+	void del_element(case_flowid_t FlowId);
+	case_symb_t find(case_flowid_t FlowId);
 	void writeToFile(string filename);
 	void init();
 #ifdef PRINT_CAL
@@ -39,28 +40,28 @@ void DRAM::init() {
 #endif
 }
 
-void DRAM::insert(int FlowId, int ByteCnt) {
+void DRAM::insert(case_flowid_t FlowId, case_bytecnt_t ByteCnt) {
 	//return;
-	map<int, int>::iterator it;
+	map<case_flowid_t, case_symb_t>::iterator it;
 	it = container.find(FlowId);
 	if (it == container.end()) {
 #ifdef PRINT_CAL
 		write_to_dram_count_new += 1;
 #endif
-		container.insert(make_pair(FlowId, ByteCnt));
+		container.insert(make_pair(FlowId, (case_symb_t)ByteCnt));
 	}
 	else {
-		int temp = it->second;
+		case_symb_t temp = it->second;
 		container.erase(it);
 #ifdef PRINT_CAL
 		write_to_dram_count_old += 1;
 #endif
-		container.insert(make_pair(FlowId, ByteCnt + temp));
+		container.insert(make_pair(FlowId, (case_symb_t)(ByteCnt + temp)));
 	}
 }
 
-int DRAM::find(int FlowId) {
-	map<int, int>::iterator it;
+case_symb_t DRAM::find(case_flowid_t FlowId) {
+	map<case_flowid_t, case_symb_t>::iterator it;
 	it = container.find(FlowId);
 	if (it == container.end()) {
 		return -1;
@@ -72,11 +73,11 @@ int DRAM::find(int FlowId) {
 
 void DRAM::writeToFile(string filename) {
 	FILE * fp = fopen(filename.c_str(), "w");
-	map<int, int>::iterator it;
+	map<case_flowid_t, case_symb_t>::iterator it;
 	it = container.begin();
 	while (it != container.end()) {
 		//cout << it->first << " ::" << it->second << endl;
-		fprintf(fp, "%d\t%d\n", it->first, it->second);
+		fprintf(fp, "%u\t%lu\n", it->first, it->second);
 		it++;
 	}
 	fclose(fp);
@@ -91,11 +92,11 @@ void DRAM::write_count_to_file() {
 }
 #endif
 
-int DRAM::count() {
+size_t DRAM::count() {
 	return container.size();
 }
 
-void DRAM::del_element(int FlowId) {
+void DRAM::del_element(case_flowid_t FlowId) {
 
 }
 

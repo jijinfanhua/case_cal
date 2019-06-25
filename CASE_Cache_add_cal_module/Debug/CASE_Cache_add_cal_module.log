@@ -1,27 +1,9 @@
 ﻿  main.cpp
-d:\vsproject\case_cal\case_cache_add_cal_module\hash_entry.h(15): warning C4091: “typedef ”: 没有声明变量时忽略“LRULOC”的左侧
-d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(64): warning C4244: “=”: 从“double”转换到“llint”，可能丢失数据
-d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(68): warning C4244: “=”: 从“double”转换到“llint”，可能丢失数据
-d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(72): warning C4244: “=”: 从“double”转换到“llint”，可能丢失数据
-d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(82): warning C4477: “fprintf”: 格式字符串“%lld”需要类型“__int64”的参数，但可变参数 1 拥有了类型“llint”
-  d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(82): note: 请考虑在格式字符串中使用“%ld”
-d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(112): warning C4477: “fprintf”: 格式字符串“%lld”需要类型“__int64”的参数，但可变参数 1 拥有了类型“llint”
-  d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(112): note: 请考虑在格式字符串中使用“%ld”
-d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(121): warning C4477: “fprintf”: 格式字符串“%lld”需要类型“__int64”的参数，但可变参数 1 拥有了类型“llint”
-  d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(121): note: 请考虑在格式字符串中使用“%ld”
-d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(121): warning C4477: “fprintf”: 格式字符串“%lld”需要类型“__int64”的参数，但可变参数 2 拥有了类型“llint”
-  d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(121): note: 请考虑在格式字符串中使用“%ld”
-d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(185): warning C4477: “fprintf”: 格式字符串“%lld”需要类型“__int64”的参数，但可变参数 1 拥有了类型“const llint”
-  d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(185): note: 请考虑在格式字符串中使用“%ld”
-d:\vsproject\case_cal\case_cache_add_cal_module\cal.h(215): warning C4477: “fprintf”: 格式字符串“%lf”需要类型“double”的参数，但可变参数 2 拥有了类型“llint”
-d:\vsproject\case_cal\case_cache_add_cal_module\sram.h(24): warning C4091: “typedef ”: 没有声明变量时忽略“S_element”的左侧
-d:\vsproject\case_cal\case_cache_add_cal_module\sram.h(110): warning C4477: “fprintf”: 格式字符串“%lld”需要类型“__int64”的参数，但可变参数 2 拥有了类型“llint”
-  d:\vsproject\case_cal\case_cache_add_cal_module\sram.h(110): note: 请考虑在格式字符串中使用“%ld”
 d:\vsproject\case_cal\case_cache_add_cal_module\big_lru.h(49): warning C4316: “CacheSet”: 在堆上分配的对象可能不是对齐 16
 d:\vsproject\case_cal\case_cache_add_cal_module\big_lru.h(50): warning C4316: “CacheSet”: 在堆上分配的对象可能不是对齐 16
 d:\vsproject\case_cal\case_cache_add_cal_module\big_lru.h(56): warning C4316: “CacheSet”: 在堆上分配的对象可能不是对齐 16
+d:\vsproject\case_cal\case_cache_add_cal_module\small_lru.h(51): warning C4316: “CacheSet”: 在堆上分配的对象可能不是对齐 16
 d:\vsproject\case_cal\case_cache_add_cal_module\small_lru.h(52): warning C4316: “CacheSet”: 在堆上分配的对象可能不是对齐 16
-d:\vsproject\case_cal\case_cache_add_cal_module\small_lru.h(53): warning C4316: “CacheSet”: 在堆上分配的对象可能不是对齐 16
-d:\vsproject\case_cal\case_cache_add_cal_module\small_lru.h(56): warning C4316: “CacheSet”: 在堆上分配的对象可能不是对齐 16
+d:\vsproject\case_cal\case_cache_add_cal_module\small_lru.h(55): warning C4316: “CacheSet”: 在堆上分配的对象可能不是对齐 16
   CASE_Cache_add_cal_module.vcxproj -> D:\VSProject\CASE_cal\Debug\CASE_Cache_add_cal_module.exe
   CASE_Cache_add_cal_module.vcxproj -> D:\VSProject\CASE_cal\Debug\CASE_Cache_add_cal_module.pdb (Full PDB)

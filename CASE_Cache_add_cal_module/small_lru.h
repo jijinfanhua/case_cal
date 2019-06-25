@@ -21,7 +21,7 @@ class SmallLRU {
 public:
 	CacheSet ** lrutable;
 	HashEntry ** hashtable;
-	int mask; //for & to get the hash value
+	case_flowid_t mask; //for & to get the hash value
 	int LRU_SIZE;
 	int lru_pointer;
 	DRAM * dram;
@@ -30,19 +30,18 @@ public:
 	CacheSet *tail;
 
 public:
-	void init(int lru_size, int m, int hash_size);
-	int find(int FlowId);
-	int insertNew(int Flow_ID, int ByteCnt);
-	int insertOld(int Flow_ID, int ByteCnt, int found);
+	void init(int lru_size, case_flowid_t m, int hash_size);
+	int find(case_flowid_t FlowId);
+	int insertNew(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt);
+	case_bytecnt_t insertOld(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found);
 	void setLRUTableEntry(int n, int p, int loc);
 	void writeAllToDRAM();
-	//void setHashTableEntry(int loc, int sid, int index);
 };
 
-void SmallLRU::init(int lru_size, int m, int hash_size) {
+void SmallLRU::init(int lru_size, case_flowid_t m, int hash_size) {
 	LRU_SIZE = lru_size;
 	mask = m;
-	hashtable = new HashEntry*[(1 << hash_size)];
+	hashtable = new HashEntry*[(int)(1 << hash_size)];
 	lrutable = new CacheSet*[LRU_SIZE];
 
 
@@ -55,11 +54,24 @@ void SmallLRU::init(int lru_size, int m, int hash_size) {
 	for (int i = 0; i < LRU_SIZE; i++) {
 		lrutable[i] = new CacheSet();
 		lrutable[i]->ctr = 0;
+
+#ifdef M128_U32
 		for (int j = 0; j < 4; j++) {
 			lrutable[i]->flow_id.m128i_u32[j] = 0xffffffff;
 			lrutable[i]->usage[j] = 0;
 			lrutable[i]->counter[j] = 0;
+			//printf("%u\n",lrutable[i]->flow_id.m128i_u32[j]);
 		}
+#else
+		uint *p = (uint*)(&(lrutable[i]->flow_id));
+		for (int j = 0; j < 4; j++) {
+			p[j] = 0xffffffff;
+			lrutable[i]->usage[j] = 0;
+			lrutable[i]->counter[j] = 0;
+			//printf("%u\n",lrutable[i]->flow_id.m128i_u32[j]);
+		}
+#endif
+
 		lrutable[i]->_previous = -1;
 		lrutable[i]->_next = -1;
 	}
@@ -77,25 +89,25 @@ void SmallLRU::init(int lru_size, int m, int hash_size) {
 	tail->_next = -1;
 }
 
-int SmallLRU::find(int FlowId) {
-	int hash_id = FlowId & mask;
+int SmallLRU::find(case_flowid_t FlowId) {
+	case_flowid_t hash_id = FlowId & mask;
 	int loc = hashtable[hash_id]->cache_loc;
 	if (loc == DEFAULT) {
 		return -1;
 	}
-	//printf("small before found\n");
-	//printf("flow_id[0]: %d\tflow_id[1]: %d\tflow_id[2]: %d\tflow_id[3]: %d\tFlowId: %d\n", lrutable[loc]->flow_id.m128i_u32[0], lrutable[loc]->flow_id.m128i_u32[1], lrutable[loc]->flow_id.m128i_u32[2],
-		//lrutable[loc]->flow_id.m128i_u32[3], FlowId);
-	//_mm_set1_epi32(FlowId);
-	//_mm_cmpeq_epi32(lrutable[loc]->flow_id, _mm_set1_epi32(FlowId));
-	//_mm_movemask_epi8(_mm_cmpeq_epi32(lrutable[loc]->flow_id, _mm_set1_epi32(FlowId)));
-	//_tzcnt_u32((_mm_movemask_epi8(_mm_cmpeq_epi32(lrutable[loc]->flow_id, _mm_set1_epi32(FlowId))) & 0x1111));
 
 	int found = (_tzcnt_u32((_mm_movemask_epi8(_mm_cmpeq_epi32(lrutable[loc]->flow_id, _mm_set1_epi32(FlowId))) & 0x1111))) >> 2;
+
+	//int found = 8;
+	//for(int i = 0; i < 4; i++){
+	//	if(lrutable[loc]->flow_id.m128i_u32[i] == FlowId){
+	//		found = i;
+	//		break;
+	//	}
+	//}
+
 	//printf("small found: %d\n", found);
 	if (found != 8) {
-		//lrutable[loc]->usage[found] = ++lrutable[loc]->ctr;
-		//return lrutable[loc]->counter[found];
 		return found;
 	}
 	else {
@@ -106,17 +118,23 @@ int SmallLRU::find(int FlowId) {
 /**
 * 已经找到，则直接加，移动指针
 */
-int SmallLRU::insertOld(int Flow_ID, int ByteCnt, int found) {
-	int hash_id = Flow_ID & mask;
+case_bytecnt_t SmallLRU::insertOld(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found) {
+	case_flowid_t hash_id = Flow_ID & mask;
 	int loc = hashtable[hash_id]->cache_loc;
 	CacheSet * entry = lrutable[loc];
 	entry->counter[found] += ByteCnt;
+	//printf("insertOld1: insert flow[%u] in loc[%d][%d]!\n", Flow_ID, loc, found);
 
 	// 若大于小流的阈值，则返回大小，并清空四路中的一路；且不移动在LRU中的位置
 	if (entry->counter[found] > SMALL_BYTE_THRES) {
-		entry->flow_id.m128i_u32[found] = 0;
+#ifdef M128_U32
+		entry->flow_id.m128i_u32[found] = 0xffffffff;
+#else
+		uint *p = (uint*)(&(entry->flow_id));
+		p[found] = 0xffffffff;
+#endif
 		entry->usage[found] = 0;
-		int temp = entry->counter[found];
+		case_bytecnt_t temp = entry->counter[found];
 		entry->counter[found] = 0;
 		return temp;
 	}
@@ -146,13 +164,13 @@ int SmallLRU::insertOld(int Flow_ID, int ByteCnt, int found) {
 1. hashtable的loc还没有值：若lru满，则从最旧的里面插入，将弹出的victim记到DRAM；若lru未满，则直接插入lru即可。
 2. hashtable的loc有值，说明之前已经有流，则在这个loc上替换最旧的即可。
 */
-int SmallLRU::insertNew(int Flow_ID, int ByteCnt) {
+int SmallLRU::insertNew(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt) {
 
 	if (ByteCnt >= SMALL_BYTE_THRES) {// 上来就大于阈值，直接返回
 		return ByteCnt;
 	}
 
-	int hash_id = Flow_ID & mask;
+	case_flowid_t hash_id = Flow_ID & mask;
 
 	if (hashtable[hash_id]->cache_loc == DEFAULT) {
 		if (lru_pointer >= LRU_SIZE) {
@@ -169,9 +187,16 @@ int SmallLRU::insertNew(int Flow_ID, int ByteCnt) {
 
 			//TODO: the original should be evicted to DRAM
 			//entry->flow_id.m128i_u32[imin]    entry->counter[imin]
+#ifdef M128_U32
 			dram->insert(entry->flow_id.m128i_u32[imin], entry->counter[imin]);
-
 			entry->flow_id.m128i_u32[imin] = Flow_ID;
+			//printf("insertNew1: insert flow[%u] in loc[%d][%d]!\n", Flow_ID, loc, imin);
+#else
+			uint *p = (uint*)(&(entry->flow_id));
+			dram->insert(p[imin], entry->counter[imin]);
+			p[imin] = Flow_ID;
+#endif
+
 			entry->counter[imin] = ByteCnt;
 			entry->usage[imin] = ++entry->ctr;
 
@@ -197,11 +222,18 @@ int SmallLRU::insertNew(int Flow_ID, int ByteCnt) {
 				}
 			}
 
-			//if (entry->flow_id.m128i_u32[imin]!=DEFAULT)， 排到DRAM中
+#ifdef M128_U32
 			if(entry->flow_id.m128i_u32[imin] != 0xffffffff)
 				dram->insert(entry->flow_id.m128i_u32[imin], entry->counter[imin]);
-
 			entry->flow_id.m128i_u32[imin] = Flow_ID;
+			//printf("insertNew2: insert flow[%u] in loc[%d][%d]!\n", Flow_ID, lru_pointer, imin);
+#else
+			uint *p = (uint*)(&(entry->flow_id));
+			if(p[imin] != 0xffffffff)
+				dram->insert(p[imin], entry->counter[imin]);
+			p[imin] = Flow_ID;
+#endif
+
 			entry->counter[imin] = ByteCnt;
 			entry->usage[imin] = ++entry->ctr;
 
@@ -234,10 +266,16 @@ int SmallLRU::insertNew(int Flow_ID, int ByteCnt) {
 			}
 		}
 
-		//TODO: Write to DRAM
+#ifdef M128_U32
 		dram->insert(entry->flow_id.m128i_u32[imin], entry->counter[imin]);
-
 		entry->flow_id.m128i_u32[imin] = Flow_ID;
+		//printf("insertNew3: insert flow[%u] in loc[%d][%d]!\n", Flow_ID, loc, imin);
+#else
+		uint *p = (uint*)(&(entry->flow_id));
+		dram->insert(p[imin], entry->counter[imin]);
+		p[imin] = Flow_ID;
+#endif
+		
 		entry->counter[imin] = ByteCnt;
 		entry->usage[imin] = ++entry->ctr;
 
@@ -261,21 +299,32 @@ int SmallLRU::insertNew(int Flow_ID, int ByteCnt) {
 }
 
 void SmallLRU::writeAllToDRAM() {
-	int flowid = 0, count = 0;
+	FILE * fp = fopen("lru1.txt","w");
+	case_flowid_t flowid = 0;
+	case_bytecnt_t count = 0;
 	for (int i = 0; i < LRU_SIZE; i++) {
+#ifdef M128_U32
 		for (int j = 0; j < 4; j++) {
-			if ((flowid = lrutable[i]->flow_id.m128i_u32[j]) != DEFAULT && (count = lrutable[i]->counter[j]) != DEFAULT) {
+			fprintf(fp,"%u:%lu\t",lrutable[i]->flow_id.m128i_u32[j], lrutable[i]->counter[j]);
+			if ((flowid = lrutable[i]->flow_id.m128i_u32[j]) != FLOWID_DEFAULT && (count = lrutable[i]->counter[j]) != COUNTER_DEFAULT) {
 				dram->insert(flowid, count);
 			}
 		}
+		fprintf(fp, "\n");
+#else
+		uint *p = (uint*)(&(lrutable[i]->flow_id));
+		for (int j = 0; j < 4; j++) {
+			fprintf(fp,"%u:%lu\t",p[j], lrutable[i]->counter[j]);
+			if ((flowid = p[j]) != FLOWID_DEFAULT && (count = lrutable[i]->counter[j]) != COUNTER_DEFAULT) {
+				dram->insert(flowid, count);
+			}
+		}
+		fprintf(fp, "\n");
+#endif
 	}
+	fclose(fp);
 	return;
 }
-
-//void SmallLRU::setHashTableEntry(int loc, int sid, int index) {
-//    hashtable[index]->cache_loc = loc;
-//    hashtable[index]->flow_id = sid;
-//}
 
 void SmallLRU::setLRUTableEntry(int n, int p, int loc) {
 	lrutable[loc]->_next = n;

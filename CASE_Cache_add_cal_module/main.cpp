@@ -7,7 +7,9 @@
 #include <string>
 #include <sstream>
 #include <fstream>
+#ifdef _WIN32
 #include <Windows.h>
+#endif
 #include <time.h>
 
 #include "big_lru.h"
@@ -19,8 +21,8 @@
 
 #define SCALE 10000000
 
-#define WRITE 0
-#define WRITE_TIMES 18
+#define WRITE 1
+#define WRITE_TIMES 36
 
 using namespace std;
 
@@ -41,8 +43,8 @@ void SplitString(const string& s, vector<string>& v, const string& c) {
 }
 
 struct desc_item {
-    unsigned long flow_id;
-    unsigned short byte_cnt;
+	case_flowid_t flow_id;
+	case_bytecnt_t byte_cnt;
     desc_item() {}
 	desc_item(string temp) {
 		vector<string> record;
@@ -64,27 +66,14 @@ typedef struct LRU_Thread_Arg {
 	int LRU_index;
 }LRU_Thread_Arg;
 
-/*void * process_data () {
-	int j = 0;
-    while (j < SCALE) {
-        buffer_q_LRU_2.push_data(buffer[j]);
-        j++;
-    }
-    return NULL;
-}*/
-
-/*
-int LRU_1_max_length = 0;
-int LRU_2_notifications_max_length = 0;
-*/
 
 void * LRU_2_LOGIC (LRU_Thread_Arg * arg) {
 	BigLRU * lru2 = biglru[arg->LRU_index];
 	long long i = 0;
 	struct desc_item temp_LRU_2;
 	int flag_LRU_2 = 0;
-	int Flow_ID = 0;
-	int ByteCnt = 0;
+	case_flowid_t Flow_ID = 0;
+	case_bytecnt_t ByteCnt = 0;
 	int found = 0;
 	//如果要写文件要保证运行足够长的时间
 	//cout << SCALE/THREAD_NUM*WRITE_TIMES << endl;
@@ -95,7 +84,11 @@ void * LRU_2_LOGIC (LRU_Thread_Arg * arg) {
 			Flow_ID = temp_LRU_2.flow_id;
 			ByteCnt = temp_LRU_2.byte_cnt;
 			if (ByteCnt > SMALL_BYTE_THRES) {
-				lru2->insertFromSmallLRU(Flow_ID, ByteCnt);	
+				if ((found = lru2->find(Flow_ID)) != -1){
+					lru2->insertFromOut(Flow_ID, ByteCnt, found);
+				}else{
+					lru2->insertFromSmallLRU(Flow_ID, ByteCnt);	
+				}
 			}
 			else {
 				if ((found = lru2->find(Flow_ID)) != -1) {
@@ -103,14 +96,13 @@ void * LRU_2_LOGIC (LRU_Thread_Arg * arg) {
 				}
 				else {
 					LRU_1_notification[arg->LRU_index]->push_data(temp_LRU_2);
-					/*int length = buffer_q_LRU_1[arg->LRU_index]->queue_size();
-					if (length > LRU_1_max_length)
-						LRU_1_max_length = length;*/
 				}
 			}
 		}
     }
+#ifdef _WIN32
 	cout << "LRU_2_LOGIC_end : " << GetCurrentTime() << endl;
+#endif
 	//cout << "buffer_q_LRU_1 : " << LRU_1_max_length << endl;
 	if (WRITE) {
 		lru2->writeAllToSRAM();
@@ -138,10 +130,10 @@ void * LRU_1_LOGIC (LRU_Thread_Arg * arg) {
 	struct desc_item temp_LRU_1;
 	int flag_LRU_1 = 0;
 	int flag_LRU_1_notification = 0;
-	int Flow_ID = 0;
-	int ByteCnt = 0;
+	case_flowid_t Flow_ID = 0;
+	case_bytecnt_t ByteCnt = 0;
 	int found = 0;
-	int value = 0;
+	case_bytecnt_t value = 0;
 	while (true && i < SCALE/THREAD_NUM*WRITE_TIMES) {
 		i++;
 		flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
@@ -175,11 +167,24 @@ void * LRU_1_LOGIC (LRU_Thread_Arg * arg) {
 		if (flag_LRU_1_notification == 0) {
 			Flow_ID = temp_LRU_1.flow_id;
 			ByteCnt = temp_LRU_1.byte_cnt;
-			lru1->insertNew(Flow_ID, ByteCnt);
+
+			found = lru1->find(Flow_ID);
+			if(found != -1){
+				value = lru1->insertOld(Flow_ID, ByteCnt, found);
+				if (value != 0) {
+					temp_LRU_1.byte_cnt = value;
+					buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
+				}
+			}else{
+				lru1->insertNew(Flow_ID, ByteCnt);
+			}
+			//lru1->insertNew(Flow_ID, ByteCnt);
 		}
     }
 	//cout << "LRU_2_notifications_max_length : " << LRU_2_notifications_max_length << endl;
+#ifdef _WIN32
 	cout << "LRU_1_LOGIC_end : " << GetCurrentTime() << endl;
+#endif
 	if (WRITE) {
 		lru1->writeAllToDRAM();
 		string str2 = "dram_accurate_value_";
@@ -205,11 +210,11 @@ void * LRU_LOGIC (LRU_Thread_Arg * arg) {
 int main() {
 	thread LRU_threads[THREAD_NUM];
 	LRU_Thread_Arg LRU_args[THREAD_NUM];
-	DWORD_PTR thread_mask[8];
+	/*DWORD_PTR thread_mask[8];
 	thread_mask[0] = 0x01;
 	for (int i = 1;i < 8;i++) {
 		thread_mask[i] = thread_mask[i] * 2; 
-	}
+	}*/
 	for (int i = 0;i < THREAD_NUM;i++) {
 		LRU_args[i].LRU_index = i;
 		buffer_q_LRU_1[i] = new QUEUE_DATA<desc_item>(SCALE);
@@ -222,6 +227,7 @@ int main() {
 	}
 	//目前使用单线程进行读取
 	ifstream readFile("D:\\report_2013.txt");
+	//ifstream readFile("test_trace.txt");
 	string s = "";
 	int i = 0;
 	while (getline(readFile, s) && i < SCALE) {

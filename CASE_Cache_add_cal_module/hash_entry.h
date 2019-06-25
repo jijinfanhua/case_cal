@@ -11,8 +11,10 @@
 #define hash_entry_h
 
 #define DEFAULT -1
+#define FLOWID_DEFAULT 0xffffffff
+#define COUNTER_DEFAULT 0xffffffff
 
-typedef enum LRULOC { S_LRU, B_LRU, NONE };
+//typedef enum LRULOC { S_LRU, B_LRU, NONE };
 
 class HashEntry {
 public:

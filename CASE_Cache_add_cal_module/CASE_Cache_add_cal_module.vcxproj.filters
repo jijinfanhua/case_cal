@@ -44,5 +44,19 @@
     <ClInclude Include="Safe_Queue.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="A_11.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="A_12.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="A_15.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="a_11.txt" />
+    <Text Include="a_12.txt" />
+    <Text Include="a_15.txt" />
   </ItemGroup>
 </Project>

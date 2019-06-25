@@ -22,6 +22,9 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="A_11.h" />
+    <ClInclude Include="A_12.h" />
+    <ClInclude Include="A_15.h" />
     <ClInclude Include="big_lru.h" />
     <ClInclude Include="cal.h" />
     <ClInclude Include="DRAM.h" />
@@ -30,6 +33,11 @@
     <ClInclude Include="set_associative.h" />
     <ClInclude Include="small_lru.h" />
     <ClInclude Include="SRAM.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="a_11.txt" />
+    <Text Include="a_12.txt" />
+    <Text Include="a_15.txt" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{11B49EC1-79AB-4AE7-ACD8-8E0BF8BDB5C3}</ProjectGuid>

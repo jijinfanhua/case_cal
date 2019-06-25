@@ -20,7 +20,7 @@ class BigLRU {
 public:
 	CacheSet ** lrutable;
 	HashEntry ** hashtable;
-	int mask; //for & to get the hash value
+	case_flowid_t mask; //for & to get the hash value
 	int LRU_SIZE;
 	int lru_pointer;
 
@@ -30,21 +30,21 @@ public:
 	CacheSet *tail;
 
 public:
-	void init(int lru_size, int m, int hash_size);
-	int find(int Flow_ID);
-	int insertFromOut(int Flow_ID, int ByteCnt, int found);
+	void init(int lru_size, case_flowid_t m, int hash_size);
+	int find(case_flowid_t Flow_ID);
+	int insertFromOut(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found);
 	void setLRUTableEntry(int n, int p, int loc);
-	int add(int Flow_id, int location, int ByteCnt, int found);
-	int insertFromSmallLRU(int Flow_ID, int ByteCnt);
-	void BigLRU::writeAllToSRAM();
+	int add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int found);
+	int insertFromSmallLRU(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt);
+	void writeAllToSRAM();
 };
 
-void BigLRU::init(int lru_size, int m, int hash_size) {
+void BigLRU::init(int lru_size, case_flowid_t m, int hash_size) {
 	LRU_SIZE = lru_size;
 	mask = m;
 
 	lrutable = new CacheSet*[LRU_SIZE];
-	hashtable = new HashEntry*[(1 << hash_size)];
+	hashtable = new HashEntry*[(int)(1 << hash_size)];
 
 	head = new CacheSet();
 	tail = new CacheSet();
@@ -55,14 +55,26 @@ void BigLRU::init(int lru_size, int m, int hash_size) {
 	for (int i = 0; i < LRU_SIZE; i++) {
 		lrutable[i] = new CacheSet();
 		lrutable[i]->ctr = 0;
+#ifdef M128_U32
 		for (int j = 0; j < 4; j++) {
 			lrutable[i]->flow_id.m128i_u32[j] = 0xffffffff;
 			lrutable[i]->usage[j] = 0;
 			lrutable[i]->counter[j] = 0;
+			//printf("%u\n",lrutable[i]->flow_id.m128i_u32[j]);
 		}
+#else
+		uint *p = (uint*)(&(lrutable[i]->flow_id));
+		for (int j = 0; j < 4; j++) {
+			p[j] = 0xffffffff;
+			lrutable[i]->usage[j] = 0;
+			lrutable[i]->counter[j] = 0;
+			//printf("%u\n",lrutable[i]->flow_id.m128i_u32[j]);
+		}
+#endif
 		lrutable[i]->_previous = -1;
 		lrutable[i]->_next = -1;
 	}
+
 
 	int temp = (1 << hash_size);
 	for (int i = 0; i < temp; i++) {
@@ -78,18 +90,16 @@ void BigLRU::init(int lru_size, int m, int hash_size) {
 }
 
 
-int BigLRU::find(int Flow_ID) {
-	int hash_id = Flow_ID & mask;
+int BigLRU::find(case_flowid_t Flow_ID) {
+	case_flowid_t hash_id = Flow_ID & mask;
 	int loc = hashtable[hash_id]->cache_loc;
 	if (loc == DEFAULT) {
 		return -1;
 	}
 	//printf("before found\n");
 	int found = _tzcnt_u32((_mm_movemask_epi8(_mm_cmpeq_epi32(lrutable[loc]->flow_id, _mm_set1_epi32(Flow_ID))) & 0x1111)) >> 2;
-	//printf("found: %d\n", found);
+
 	if (found != 8) {
-		//lrutable[loc]->usage[found] = ++lrutable[loc]->ctr;
-		//return lrutable[loc]->counter[found];
 		return found;
 	}
 	else {
@@ -97,8 +107,8 @@ int BigLRU::find(int Flow_ID) {
 	}
 }
 
-int BigLRU::insertFromOut(int Flow_ID, int ByteCnt, int found) {
-	int hash_id = Flow_ID & mask;
+int BigLRU::insertFromOut(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found) {
+	case_flowid_t hash_id = Flow_ID & mask;
 	add(Flow_ID, hashtable[hash_id]->cache_loc, ByteCnt, found);
 	return 1;
 }
@@ -107,7 +117,7 @@ int BigLRU::insertFromOut(int Flow_ID, int ByteCnt, int found) {
 /**
 超过LRU2阈值与不超过LRU2阈值
 */
-int BigLRU::add(int Flow_id, int location, int ByteCnt, int found) {
+int BigLRU::add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int found) {
 	CacheSet * entry = lrutable[location];
 	if (entry->counter[found] + ByteCnt <= BIG_BYTE_THRES) {
 		entry->counter[found] += ByteCnt;
@@ -129,7 +139,6 @@ int BigLRU::add(int Flow_id, int location, int ByteCnt, int found) {
 		return 0;
 	}
 	else {
-
 		// write to SRAM and save the flow id
 		sram->insert(Flow_id, entry->counter[found] + ByteCnt);
 
@@ -157,15 +166,12 @@ int BigLRU::add(int Flow_id, int location, int ByteCnt, int found) {
 	return 0;
 }
 
-int BigLRU::insertFromSmallLRU(int Flow_ID, int ByteCnt) {
+int BigLRU::insertFromSmallLRU(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt) {
 	//LRU2中肯定没有这一项
 	//1. 如果LRU2没有满，则直接放在lru_index，调整相应的数值；
 	//2. 如果LRU2已经满了，也是放
 
-
-	vector<int> a;
-
-	int hash_id = Flow_ID & mask;
+	case_flowid_t hash_id = Flow_ID & mask;
 
 	if (hashtable[hash_id]->cache_loc == DEFAULT) {
 		if (lru_pointer >= LRU_SIZE) {
@@ -182,9 +188,17 @@ int BigLRU::insertFromSmallLRU(int Flow_ID, int ByteCnt) {
 
 			//TODO: the original should be evicted to SRAM
 			//entry->flow_id.m128i_u32[imin]    entry->counter[imin]
+#ifdef M128_U32
 			sram->insert(entry->flow_id.m128i_u32[imin], entry->counter[imin]);
-
 			entry->flow_id.m128i_u32[imin] = Flow_ID;
+#else
+			uint *p = (uint*)(&(entry->flow_id));
+			sram->insert(p[imin], entry->counter[imin]);
+			p[imin] = Flow_ID;
+#endif
+			//printf("%d\t%d\n", entry->flow_id.m128i_u32[imin], entry->counter[imin]);
+
+			
 			entry->counter[imin] = ByteCnt;
 			entry->usage[imin] = ++entry->ctr;
 
@@ -210,11 +224,20 @@ int BigLRU::insertFromSmallLRU(int Flow_ID, int ByteCnt) {
 				}
 			}
 
-			//if (entry->flow_id.m128i_u32[imin]!=DEFAULT)， 排到SRAM中
-			if(entry->flow_id.m128i_u32[imin]!=DEFAULT)
+#ifdef M128_U32
+			if(entry->flow_id.m128i_u32[imin]!=0xffffffff){
 				sram->insert(entry->flow_id.m128i_u32[imin], entry->counter[imin]);
+			}
 
 			entry->flow_id.m128i_u32[imin] = Flow_ID;
+#else
+			uint *p = (uint*)(&(entry->flow_id));
+			if(p[imin] != FLOWID_DEFAULT)
+				sram->insert(p[imin], entry->counter[imin]);
+
+			p[imin] = Flow_ID;
+#endif
+			
 			entry->counter[imin] = ByteCnt;
 			entry->usage[imin] = ++entry->ctr;
 
@@ -247,10 +270,18 @@ int BigLRU::insertFromSmallLRU(int Flow_ID, int ByteCnt) {
 			}
 		}
 
-		//TODO: Write to SRAM
-		sram->insert(entry->flow_id.m128i_u32[imin], entry->counter[imin]);
-
+#ifdef M128_U32
+		if(entry->flow_id.m128i_u32[imin] != 0xffffffff){
+			sram->insert(entry->flow_id.m128i_u32[imin], entry->counter[imin]);
+		}
+		
 		entry->flow_id.m128i_u32[imin] = Flow_ID;
+#else
+		uint *p = (uint*)(&(entry->flow_id));
+		sram->insert(p[imin], entry->counter[imin]);
+
+		p[imin] = Flow_ID;
+#endif
 		entry->counter[imin] = ByteCnt;
 		entry->usage[imin] = ++entry->ctr;
 
@@ -274,14 +305,30 @@ int BigLRU::insertFromSmallLRU(int Flow_ID, int ByteCnt) {
 }
 
 void BigLRU::writeAllToSRAM() {
-	int flowid = 0, count = 0;
+	FILE * fp = fopen("lru2.txt","w");
+	case_flowid_t flowid = 0;
+	case_bytecnt_t count = 0;
 	for (int i = 0; i < LRU_SIZE; i++) {
+#ifdef M128_U32
 		for (int j = 0; j < 4; j++) {
-			if ((flowid = lrutable[i]->flow_id.m128i_u32[j]) != DEFAULT && (count = lrutable[i]->counter[j]) != DEFAULT) {
+			fprintf(fp,"%u:%lu\t",lrutable[i]->flow_id.m128i_u32[j], lrutable[i]->counter[j]);
+			if ((flowid = lrutable[i]->flow_id.m128i_u32[j]) != FLOWID_DEFAULT && (count = lrutable[i]->counter[j]) != COUNTER_DEFAULT) {
 				sram->insert(flowid, count);
 			}
 		}
+		fprintf(fp, "\n");
+#else
+		uint *p = (uint*)(&(lrutable[i]->flow_id));
+		for (int j = 0; j < 4; j++) {
+			fprintf(fp,"%u:%lu\t",p[j], lrutable[i]->counter[j]);
+			if ((flowid = p[j]) != FLOWID_DEFAULT && (count = lrutable[i]->counter[j]) != COUNTER_DEFAULT) {
+				sram->insert(flowid, count);
+			}
+		}
+		fprintf(fp, "\n");
+#endif
 	}
+	fclose(fp);
 	return;
 }
 
