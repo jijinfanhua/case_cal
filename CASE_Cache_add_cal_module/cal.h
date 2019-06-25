@@ -11,7 +11,7 @@
 #include "A_12.h"
 #include "A_15.h"
 
-#define COMPRESS 1
+//#define COMPRESS 1
 //#define PRINT_CAL 1
 //#define M128_U32 1
 
@@ -182,7 +182,7 @@ double Calculate::FC_OEF(case_symb_t c, double a, int level) {
 #ifdef PRINT_CAL
 	f_c_container.insert(make_pair(c, a));
 #endif
-	double x;
+	/*double x;
 	if(c <= 201460){
 		if(level == 1){
 			x = A15->a[c];
@@ -193,8 +193,8 @@ double Calculate::FC_OEF(case_symb_t c, double a, int level) {
 		}
 	}else{
 		x = (pow((1 + a), (double)c) - 1) / a*(2 + a) / 2;
-	}
-	//double x = (pow((1 + a), (double)c) - 1) / a*(2 + a) / 2;
+	}*/
+	double x = (pow((1 + a), (double)c) - 1) / a*(2 + a) / 2;
 	return x;
 }
 
