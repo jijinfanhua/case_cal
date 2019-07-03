@@ -30,7 +30,7 @@ using namespace std;
 
 SmallLRU *smalllru[THREAD_NUM];
 BigLRU *biglru[THREAD_NUM];
-int index1 = 0, index2 = 0;
+int index1[THREAD_NUM] , index2[THREAD_NUM];
 
 void SplitString(const string &s, vector<string> &v, const string &c) {
     string::size_type pos1, pos2;
@@ -80,7 +80,7 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
     int found = 0;
     //如果要写文件要保证运行足够长的时间
     //cout << SCALE/THREAD_NUM*WRITE_TIMES << endl;
-    while (index1 + index2 < SCALE-1) {
+    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
         if (buffer_q_LRU_2[arg->LRU_index]->pop_data(&temp_LRU_2) == 0) {
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
@@ -90,11 +90,11 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
                 } else {
                     lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
                 }
-                index2++;
+                index2[arg->LRU_index]++;
             } else {
                 if ((found = lru2->find(Flow_ID)) != -1) {
                     lru2->insertFromOut(Flow_ID, ByteCnt, found);
-                    index2++;
+                    index2[arg->LRU_index]++;
                 } else {
                     LRU_1_notification[arg->LRU_index]->push_data(temp_LRU_2);
                 }
@@ -132,7 +132,7 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
     case_bytecnt_t ByteCnt = 0;
     int found = 0;
     case_bytecnt_t value = 0;
-    while (index1 + index2 < SCALE-1) {
+    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
         flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
         if (flag_LRU_1 == 0) {
 //            LRU_1_index++;
@@ -155,11 +155,11 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
                     if (length > LRU_2_notifications_max_length)
                         LRU_2_notifications_max_length = length;*/
                 } else
-                    index1++;
+                    index1[arg->LRU_index]++;
             } else {
                 //buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
                 lru1->insertNew(Flow_ID, ByteCnt);
-                index1++;
+                index1[arg->LRU_index]++;
             }
         }
 
@@ -174,10 +174,10 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
                     temp_LRU_1.byte_cnt = value;
                     buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
                 } else
-                    index1++;
+                    index1[arg->LRU_index]++;
             } else {
                 lru1->insertNew(Flow_ID, ByteCnt);
-                index1++;
+                index1[arg->LRU_index]++;
             }
             //lru1->insertNew(Flow_ID, ByteCnt);
         }
@@ -219,6 +219,7 @@ int main() {
         thread_mask[i] = thread_mask[i] * 2;
     }*/
     for (int i = 0; i < THREAD_NUM; i++) {
+        index1[i]=index2[i]=0;
         LRU_args[i].LRU_index = i;
         buffer_q_LRU_1[i] = new QUEUE_DATA<desc_item>(SCALE);
         buffer_q_LRU_2[i] = new QUEUE_DATA<desc_item>(SCALE);
