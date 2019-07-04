@@ -96,7 +96,29 @@ int SmallLRU::find(case_flowid_t FlowId) {
 		return -1;
 	}
 
+#ifdef SIMD_FUNC
+	/*
+	 * _mm_set1_epi32: copy one int to four, dst[i+31:i] = a[31:0]
+	 * _mm_cmpeq_epi32: compare two 128bits, 31:0, dst[i+31:i] := ( a[i+31:i] == b[i+31:i] ) ? 0xFFFFFFFF : 0
+	 * _mm_movemask_epi8: get the lowest bit of each 8bits.
+	 * the possible result is:
+	 * 		00000000000000000 0000111111111111
+	 * 		00000000000000000 1111000011111111
+	 * 		00000000000000000 1111111100001111
+	 * 		00000000000000000 1111111111110000
+	 * 		00000000000000000 1111111111111111
+	 * 	_tzcnt_u32:
+	 * */
 	int found = (_tzcnt_u32((_mm_movemask_epi8(_mm_cmpeq_epi32(lrutable[loc]->flow_id, _mm_set1_epi32(FlowId))) & 0x1111))) >> 2;
+#else
+	int found = 8;
+	for(int i = 0; i < 4; i++){
+		if (((uint*)&(lrutable[loc]->flow_id))[i] == FlowId){
+			found = i;
+			break;
+		}
+	}
+#endif
 
 	//int found = 8;
 	//for(int i = 0; i < 4; i++){

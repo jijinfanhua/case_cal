@@ -14,13 +14,10 @@
 #define COMPRESS 1
 //#define PRINT_CAL 1
 //#define M128_U32 1
+#define SIMD_FUNC 1
 
 typedef long int llint;
 typedef unsigned int uint;
-
-//define the flow_id type is (unsigned int)
-//		 the ByteCnt type is (unsigned long)
-//		 the symbValue type is (unsigned long)
 
 typedef unsigned int case_flowid_t;
 typedef unsigned long case_bytecnt_t;
@@ -97,7 +94,7 @@ double Calculate::backToRealValue(case_symb_t symb_value, int scale) {
 	}
 	else if (scale == 1)
 	{
-		esti_value = FC_OEF(symb_value, a_15, 1);//FC_OEFÊÇËã»ØÀ´Âð
+		esti_value = FC_OEF(symb_value, a_15, 1);//FC_OEFï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	}
 	else if (scale == 2)
 	{

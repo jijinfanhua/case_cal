@@ -97,7 +97,18 @@ int BigLRU::find(case_flowid_t Flow_ID) {
 		return -1;
 	}
 	//printf("before found\n");
+
+#ifdef SIMD_FUNC
 	int found = _tzcnt_u32((_mm_movemask_epi8(_mm_cmpeq_epi32(lrutable[loc]->flow_id, _mm_set1_epi32(Flow_ID))) & 0x1111)) >> 2;
+#else
+	int found = 8;
+	for(int i = 0; i < 4; i++){
+		if (((uint*)&(lrutable[loc]->flow_id))[i] == Flow_ID){
+			found = i;
+			break;
+		}
+	}
+#endif
 
 	if (found != 8) {
 		return found;
