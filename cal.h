@@ -94,7 +94,7 @@ double Calculate::backToRealValue(case_symb_t symb_value, int scale) {
 	}
 	else if (scale == 1)
 	{
-		esti_value = FC_OEF(symb_value, a_15, 1);//FC_OEF���������
+		esti_value = FC_OEF(symb_value, a_15, 1);
 	}
 	else if (scale == 2)
 	{
