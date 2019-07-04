@@ -9,6 +9,8 @@ FARM：Fast Accurate peR-flow Measurement
 ### 2019年7月4日
 1. 使用index[]数组来替换WRITE_TIMES逻辑
 2. 加入线程对的速度测试，使用SPD_TEST开关
+3. 去除一些冗余逻辑
+4. make clean将删除程序运行中生成的txt文件
 
 ## 常量宏释义
 * THREAD_NUM 线程数量

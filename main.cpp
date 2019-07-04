@@ -8,7 +8,7 @@
 #include <string>
 #include <sstream>
 #include <fstream>
-
+#include <chrono>
 #ifdef _WIN32
 #include <Windows.h>
 #endif
@@ -19,14 +19,15 @@
 #include "small_lru.h"
 #include "Safe_Queue.h"
 
-#define THREAD_NUM 4
+#define THREAD_NUM 1
 #define CORE_NUM 4
 #define SCALE 20000000
 #define WRITE true
 #define SPD_TEST true
-#define START_PERCENT 0.7
+#define START_PERCENT 0.25
 #define END_PERCENT 0.75
 using namespace std;
+using namespace chrono;
 
 SmallLRU *smalllru[THREAD_NUM];
 BigLRU *biglru[THREAD_NUM];
@@ -66,7 +67,6 @@ struct desc_item {
 
 QUEUE_DATA<desc_item> *buffer_q_LRU_1[THREAD_NUM];
 QUEUE_DATA<desc_item> *buffer_q_LRU_2[THREAD_NUM];
-QUEUE_DATA<desc_item> *LRU_1_notification[THREAD_NUM];
 
 typedef struct LRU_Thread_Arg {
     int LRU_index;
@@ -97,13 +97,12 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
                     lru2->insertFromOut(Flow_ID, ByteCnt, found);
                     index2[arg->LRU_index]++;
                 } else {
-                    LRU_1_notification[arg->LRU_index]->push_data(temp_LRU_2);
+                    buffer_q_LRU_1[arg->LRU_index]->push_data(temp_LRU_2);
                 }
             }
         }
     }
-//    string msg="LRU2:index1="+to_string(index1)+", index2="+to_string(index2)+'\n';
-//    cout<<msg;
+
 #ifdef _WIN32
     cout << "LRU_2_LOGIC_end : " << GetCurrentTime() << endl;
 #endif
@@ -172,32 +171,12 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
                 index1[arg->LRU_index]++;
             }
         }
-
-        if (LRU_1_notification[arg->LRU_index]->pop_data(&temp_LRU_1) == 0) {
-            Flow_ID = temp_LRU_1.flow_id;
-            ByteCnt = temp_LRU_1.byte_cnt;
-            found = lru1->find(Flow_ID);
-            if (found != -1) {
-                value = lru1->insertOld(Flow_ID, ByteCnt, found);
-
-                if (value != 0) {
-                    temp_LRU_1.byte_cnt = value;
-                    buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
-                } else
-                    index1[arg->LRU_index]++;
-            } else {
-                lru1->insertNew(Flow_ID, ByteCnt);
-                index1[arg->LRU_index]++;
-            }
-            //lru1->insertNew(Flow_ID, ByteCnt);
-        }
     }
-//    string msg="LRU1:index1="+to_string(index1)+", index2="+to_string(index2)+'\n';
-//    cout<<msg;
-    //cout << "LRU_2_notifications_max_length : " << LRU_2_notifications_max_length << endl;
+
 #ifdef _WIN32
     cout << "LRU_1_LOGIC_end : " << GetCurrentTime() << endl;
 #endif
+
     if (WRITE) {
         lru1->writeAllToDRAM();
         string str2 = "dram_accurate_value_";
@@ -233,7 +212,7 @@ int main() {
         LRU_args[i].LRU_index = i;
         buffer_q_LRU_1[i] = new QUEUE_DATA<desc_item>(SCALE);
         buffer_q_LRU_2[i] = new QUEUE_DATA<desc_item>(SCALE);
-        LRU_1_notification[i] = new QUEUE_DATA<desc_item>(SCALE/*/10000*/);
+        //LRU_1_notification[i] = new QUEUE_DATA<desc_item>(SCALE/*/10000*/);
         smalllru[i] = new SmallLRU();
         biglru[i] = new BigLRU();
         smalllru[i]->init(16 * 1024, 0x3fff, 14);
@@ -257,39 +236,31 @@ int main() {
         LRU_threads[i] = thread(LRU_LOGIC, &LRU_args[i]);
         //SetThreadAffinityMask(LRU_threads[i].native_handle(),thread_mask[i%CORE_NUM]);
     }
-
-    //thread thread_process_data(process_data);
-    //thread_process_data.join();
-
-    clock_t start, finish;
     double totaltime;
-    start = clock();
+    auto start = system_clock::now();
     for (int i = 0; i < THREAD_NUM; i++) {
         LRU_threads[i].join();
     }
-    finish = clock();
-    totaltime = (double) (finish - start) / CLOCKS_PER_SEC;
+    auto finish = system_clock::now();
+    duration<double> diff = finish - start;
+    totaltime = diff.count();
 
     cout << totaltime << endl;
     double speed = SCALE / totaltime / 1000 / 1000;
     cout << speed << endl;
+
 #if SPD_TEST
 	for (int i = 0; i < THREAD_NUM; i++)
 	{
-		cout << "Thread" << i << ':' << (SCALE/THREAD_NUM*(END_PERCENT-START_PERCENT))/((double)(endTime[i] - startTime[i]) / CLOCKS_PER_SEC)/1000000<<"pps"<<endl;
+		cout << "Thread" << i << ": "<< (SCALE/THREAD_NUM*(END_PERCENT-START_PERCENT))/((double)(endTime[i] - startTime[i]) / CLOCKS_PER_SEC)/1000000<<" Mpps"<<endl;
 	}
 #endif
-    /*double totaltime_new = (double) (LRU_1_finish - LRU_1_start) / CLOCKS_PER_SEC;
-    double speed_new = SCALE / 2 / totaltime_new / 1000 / 1000;
-    cout << "totaltime_new : " << totaltime_new << endl;
-    cout << "speed_new : " << speed_new << endl;*/
 
     for (int i = 0; i < THREAD_NUM; i++) {
         delete smalllru[i];
         delete biglru[i];
         delete buffer_q_LRU_1[i];
         delete buffer_q_LRU_2[i];
-        delete LRU_1_notification[i];
     }
 #ifdef _WIN32
 	system("pause");
