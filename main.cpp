@@ -31,7 +31,7 @@ using namespace chrono;
 
 SmallLRU *smalllru[THREAD_NUM];
 BigLRU *biglru[THREAD_NUM];
-int index1[THREAD_NUM] , index2[THREAD_NUM];
+volatile int index1[THREAD_NUM] , index2[THREAD_NUM];
 double dur[THREAD_NUM];
 
 void SplitString(const string &s, vector<string> &v, const string &c) {
@@ -181,9 +181,9 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
         }
     }
 
-    std::cout << buffer_q_LRU_1[arg->LRU_index]->queue_size() << endl;
-    std::cout << buffer_q_LRU_2[arg->LRU_index]->queue_size() << endl;
-    std::cout << LRU_2_notifications[arg->LRU_index]->queue_size() << endl;
+    //std::cout << buffer_q_LRU_1[arg->LRU_index]->queue_size() << endl;
+    //std::cout << buffer_q_LRU_2[arg->LRU_index]->queue_size() << endl;
+    //std::cout << LRU_2_notifications[arg->LRU_index]->queue_size() << endl;
     
 
 #ifdef _WIN32
