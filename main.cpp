@@ -67,6 +67,7 @@ struct desc_item {
 
 QUEUE_DATA<desc_item> *buffer_q_LRU_1[THREAD_NUM];
 QUEUE_DATA<desc_item> *buffer_q_LRU_2[THREAD_NUM];
+QUEUE_DATA<desc_item> *LRU_2_notifications[THREAD_NUM];
 
 typedef struct LRU_Thread_Arg {
     int LRU_index;
@@ -113,14 +114,15 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
                 value = lru1->insertOld(Flow_ID, ByteCnt, found);
                 if (value != 0) {
                     temp_LRU_1.byte_cnt = value;
-                    buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
+                    //buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
+                    LRU_2_notifications[arg->LRU_index]->push_data(temp_LRU_1);
                     /*int length = LRU_2_notifications[arg->LRU_index]->queue_size();
                     if (length > LRU_2_notifications_max_length)
                         LRU_2_notifications_max_length = length;*/
-                } else
+                } else {
                     index1[arg->LRU_index]++;
+                }
             } else {
-                //buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
                 lru1->insertNew(Flow_ID, ByteCnt);
                 index1[arg->LRU_index]++;
             }
@@ -155,23 +157,34 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
         if (buffer_q_LRU_2[arg->LRU_index]->pop_data(&temp_LRU_2) == 0) {
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
-            if (ByteCnt > SMALL_BYTE_THRES) {
-                if ((found = lru2->find(Flow_ID)) != -1) {
-                    lru2->insertFromOut(Flow_ID, ByteCnt, found);
-                } else {
-                    lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
-                }
-                index2[arg->LRU_index]++;
+
+            if ((found = lru2->find(Flow_ID)) != -1) {
+                lru2->insertFromOut(Flow_ID, ByteCnt, found);
+                index2[arg->LRU_index] ++;
+            } else if (ByteCnt > SMALL_BYTE_THRES) {
+                lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
+                index2[arg->LRU_index] ++;
             } else {
-                if ((found = lru2->find(Flow_ID)) != -1) {
-                    lru2->insertFromOut(Flow_ID, ByteCnt, found);
-                    index2[arg->LRU_index]++;
-                } else {
-                    buffer_q_LRU_1[arg->LRU_index]->push_data(temp_LRU_2);
-                }
+                buffer_q_LRU_1[arg->LRU_index]->push_data(temp_LRU_2);
             }
         }
+
+        if (LRU_2_notifications[arg->LRU_index]->pop_data(&temp_LRU_2) == 0) {
+            Flow_ID = temp_LRU_2.flow_id;
+            ByteCnt = temp_LRU_2.byte_cnt;
+            if ((found = lru2->find(Flow_ID)) != -1) {
+                lru2->insertFromOut(Flow_ID, ByteCnt, found);
+            } else {
+                lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
+            }
+            index2[arg->LRU_index] ++;
+        }
     }
+
+    std::cout << buffer_q_LRU_1[arg->LRU_index]->queue_size() << endl;
+    std::cout << buffer_q_LRU_2[arg->LRU_index]->queue_size() << endl;
+    std::cout << LRU_2_notifications[arg->LRU_index]->queue_size() << endl;
+    
 
 #ifdef _WIN32
     cout << "LRU_2_LOGIC_end : " << GetCurrentTime() << endl;
@@ -216,7 +229,7 @@ int main() {
         LRU_args[i].LRU_index = i;
         buffer_q_LRU_1[i] = new QUEUE_DATA<desc_item>(SCALE);
         buffer_q_LRU_2[i] = new QUEUE_DATA<desc_item>(SCALE);
-        //LRU_1_notification[i] = new QUEUE_DATA<desc_item>(SCALE/*/10000*/);
+        LRU_2_notifications[i] = new QUEUE_DATA<desc_item>(1024);
         smalllru[i] = new SmallLRU();
         biglru[i] = new BigLRU();
         smalllru[i]->init(16 * 1024, 0x3fff, 14);
@@ -249,15 +262,15 @@ int main() {
     duration<double> diff = finish - start;
     totaltime = diff.count();
 
-    cout << totaltime << endl;
+    std::cout << totaltime << endl;
     double speed = SCALE / totaltime / 1000 / 1000;
-    cout << speed << endl;
+    std::cout << speed << endl;
 
 #if SPD_TEST
 	for (int i = 0; i < THREAD_NUM; i++)
 	{
-		cout << "Thread" << i << ": "<< (SCALE/THREAD_NUM*(END_PERCENT-START_PERCENT))/dur[i]/1000000<<" Mpps"<<endl;
-		cout<<"index1["<<i<<"]:"<<index1[i]<<"  index2["<<i<<"]:"<<index2[i]<<endl;
+		std::cout << "Thread" << i << ": "<< (SCALE/THREAD_NUM*(END_PERCENT-START_PERCENT))/dur[i]/1000000<<" Mpps"<<endl;
+		std::cout<<"index1["<<i<<"]:"<<index1[i]<<"  index2["<<i<<"]:"<<index2[i]<<endl;
 	}
 #endif
 
