@@ -3,7 +3,7 @@ lib =
 build_dir = build
 target = CASE_Cache_parallel_LRU
 objects = main.o
-cc = g++ -std=c++11 -msse2 -mbmi -lm -Wall -fmessage-length=0 -pthread -o2
+cc = g++ -std=c++11 -msse2 -mbmi -lm -Wall -fmessage-length=0 -pthread -O1
 
 $(target): $(objects)
 	$(cc) -o $(target) $(objects)
