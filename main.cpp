@@ -32,7 +32,7 @@ using namespace chrono;
 SmallLRU *smalllru[THREAD_NUM];
 BigLRU *biglru[THREAD_NUM];
 int index1[THREAD_NUM] , index2[THREAD_NUM];
-int startTime[THREAD_NUM], endTime[THREAD_NUM];
+double dur[THREAD_NUM];
 
 void SplitString(const string &s, vector<string> &v, const string &c) {
     string::size_type pos1, pos2;
@@ -73,6 +73,76 @@ typedef struct LRU_Thread_Arg {
 } LRU_Thread_Arg;
 
 
+
+
+void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
+
+#if SPD_TEST
+	bool startFlag = true, endFlag = true;
+    auto start = system_clock::now();
+    auto finish = system_clock::now();
+#endif
+
+    SmallLRU *lru1 = smalllru[arg->LRU_index];
+    struct desc_item temp_LRU_1;
+    int flag_LRU_1 = 0;
+    case_flowid_t Flow_ID = 0;
+    case_bytecnt_t ByteCnt = 0;
+    int found = 0;
+    case_bytecnt_t value = 0;
+    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
+
+#if SPD_TEST
+		if (startFlag && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * START_PERCENT)) {
+			start=system_clock::now();
+			startFlag = false;
+		}
+		if (endFlag && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * END_PERCENT)) {
+            finish=system_clock::now();
+            dur[arg->LRU_index]=((duration<double>)(finish-start)).count();
+			endFlag = false;
+		}
+#endif
+
+        flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
+        if (flag_LRU_1 == 0) {
+            Flow_ID = temp_LRU_1.flow_id;
+            ByteCnt = temp_LRU_1.byte_cnt;
+            found = lru1->find(Flow_ID);
+            if (found != -1) {
+                value = lru1->insertOld(Flow_ID, ByteCnt, found);
+                if (value != 0) {
+                    temp_LRU_1.byte_cnt = value;
+                    buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
+                    /*int length = LRU_2_notifications[arg->LRU_index]->queue_size();
+                    if (length > LRU_2_notifications_max_length)
+                        LRU_2_notifications_max_length = length;*/
+                } else
+                    index1[arg->LRU_index]++;
+            } else {
+                //buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
+                lru1->insertNew(Flow_ID, ByteCnt);
+                index1[arg->LRU_index]++;
+            }
+        }
+    }
+
+#ifdef _WIN32
+    cout << "LRU_1_LOGIC_end : " << GetCurrentTime() << endl;
+#endif
+
+    if (WRITE) {
+        lru1->writeAllToDRAM();
+        string str2 = "dram_accurate_value_";
+        string str3 = std::to_string(arg->LRU_index);
+        string str4 = ".txt";
+        lru1->dram->writeToFile(str2 + str3 + str4);
+    }
+#if PRINT_CAL
+    lru1->dram->write_count_to_file();
+#endif
+    return nullptr;
+}
 void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
     BigLRU *lru2 = biglru[arg->LRU_index];
     struct desc_item temp_LRU_2;
@@ -120,72 +190,6 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
     lru2->sram->cal_table_write_to_file();
     lru2->sram->write_count_to_file();
     lru2->sram->off_cal_file();
-#endif
-    return nullptr;
-}
-
-void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
-
-#if SPD_TEST
-	bool startFlag = true, endFlag = true;
-#endif
-
-    SmallLRU *lru1 = smalllru[arg->LRU_index];
-    struct desc_item temp_LRU_1;
-    int flag_LRU_1 = 0;
-    case_flowid_t Flow_ID = 0;
-    case_bytecnt_t ByteCnt = 0;
-    int found = 0;
-    case_bytecnt_t value = 0;
-    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
-
-#if SPD_TEST
-		if (startFlag && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * START_PERCENT)) {
-			startTime[arg->LRU_index] = clock();
-			startFlag = false;
-		}
-		if (endFlag && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * END_PERCENT)) {
-			endTime[arg->LRU_index] = clock();
-			endFlag = false;
-		}
-#endif
-
-        flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
-        if (flag_LRU_1 == 0) {
-            Flow_ID = temp_LRU_1.flow_id;
-            ByteCnt = temp_LRU_1.byte_cnt;
-            found = lru1->find(Flow_ID);
-            if (found != -1) {
-                value = lru1->insertOld(Flow_ID, ByteCnt, found);
-                if (value != 0) {
-                    temp_LRU_1.byte_cnt = value;
-                    buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
-                    /*int length = LRU_2_notifications[arg->LRU_index]->queue_size();
-                    if (length > LRU_2_notifications_max_length)
-                        LRU_2_notifications_max_length = length;*/
-                } else
-                    index1[arg->LRU_index]++;
-            } else {
-                //buffer_q_LRU_2[arg->LRU_index]->push_data(temp_LRU_1);
-                lru1->insertNew(Flow_ID, ByteCnt);
-                index1[arg->LRU_index]++;
-            }
-        }
-    }
-
-#ifdef _WIN32
-    cout << "LRU_1_LOGIC_end : " << GetCurrentTime() << endl;
-#endif
-
-    if (WRITE) {
-        lru1->writeAllToDRAM();
-        string str2 = "dram_accurate_value_";
-        string str3 = std::to_string(arg->LRU_index);
-        string str4 = ".txt";
-        lru1->dram->writeToFile(str2 + str3 + str4);
-    }
-#if PRINT_CAL
-    lru1->dram->write_count_to_file();
 #endif
     return nullptr;
 }
@@ -252,7 +256,8 @@ int main() {
 #if SPD_TEST
 	for (int i = 0; i < THREAD_NUM; i++)
 	{
-		cout << "Thread" << i << ": "<< (SCALE/THREAD_NUM*(END_PERCENT-START_PERCENT))/((double)(endTime[i] - startTime[i]) / CLOCKS_PER_SEC)/1000000<<" Mpps"<<endl;
+		cout << "Thread" << i << ": "<< (SCALE/THREAD_NUM*(END_PERCENT-START_PERCENT))/dur[i]/1000000<<" Mpps"<<endl;
+		cout<<"index1["<<i<<"]:"<<index1[i]<<"  index2["<<i<<"]:"<<index2[i]<<endl;
 	}
 #endif
 
