@@ -96,7 +96,7 @@ int SmallLRU::find(case_flowid_t FlowId) {
 		return -1;
 	}
 
-#ifdef SIMD_FUNC
+#if SIMD_FUNC
 	/*
 	 * _mm_set1_epi32: copy one int to four, dst[i+31:i] = a[31:0]
 	 * _mm_cmpeq_epi32: compare two 128bits, 31:0, dst[i+31:i] := ( a[i+31:i] == b[i+31:i] ) ? 0xFFFFFFFF : 0

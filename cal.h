@@ -14,7 +14,7 @@
 #define COMPRESS 1
 //#define PRINT_CAL 1
 //#define M128_U32 1
-#define SIMD_FUNC 1
+#define SIMD_FUNC 0
 
 typedef long int llint;
 typedef unsigned int uint;
