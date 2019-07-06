@@ -33,7 +33,11 @@ SmallLRU *smalllru[THREAD_NUM];
 BigLRU *biglru[THREAD_NUM];
 int index1[THREAD_NUM] , index2[THREAD_NUM];
 double dur[THREAD_NUM];
-
+#if SPD_TEST
+bool startFlag = true, endFlag = true;
+auto start = system_clock::now();
+auto finish = system_clock::now();
+#endif
 void SplitString(const string &s, vector<string> &v, const string &c) {
     string::size_type pos1, pos2;
     pos2 = s.find(c);
@@ -77,12 +81,6 @@ typedef struct LRU_Thread_Arg {
 
 void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
 
-#if SPD_TEST
-	bool startFlag = true, endFlag = true;
-    auto start = system_clock::now();
-    auto finish = system_clock::now();
-#endif
-
     SmallLRU *lru1 = smalllru[arg->LRU_index];
     struct desc_item temp_LRU_1;
     int flag_LRU_1 = 0;
@@ -92,7 +90,7 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
     case_bytecnt_t value = 0;
     while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
 
-#if SPD_TEST
+#if false
 		if (startFlag && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * START_PERCENT)) {
 			start=system_clock::now();
 			startFlag = false;
@@ -152,6 +150,17 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
     //如果要写文件要保证运行足够长的时间
     //cout << SCALE/THREAD_NUM*WRITE_TIMES << endl;
     while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
+#if SPD_TEST
+		if (startFlag && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * START_PERCENT)) {
+			start = system_clock::now();
+			startFlag = false;
+		}
+		if (endFlag && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * END_PERCENT)) {
+			finish = system_clock::now();
+			dur[arg->LRU_index] = ((duration<double>)(finish - start)).count();
+			endFlag = false;
+		}
+#endif
         if (buffer_q_LRU_2[arg->LRU_index]->pop_data(&temp_LRU_2) == 0) {
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
