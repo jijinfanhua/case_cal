@@ -4,8 +4,15 @@ FARM：Fast Accurate peR-flow Measurement
 
 ## 更新日志
 ### 阶段工作
-* 流量进入的LRU模块正确性验证
-* LRU2大小问题以及Hash优化
+* 考虑使用向LRU2增加工作负担的办法减少LRU1Buffer的长度
+  1. 直接在LRU2中插入的办法，可在10^-7级别增加精确度，但会带来较大速度损失
+  2. 采用LRU2线程帮助LRU1线程处理的方法，亦会降低速度
+### 2019年7月7日
+1. 修复速度测试BUG
+### 2019年7月5日
+1. 将速度测试改为时钟计时(原为CPU滴答数)
+2. 加入volatile使能-O2/-O3(Czk)
+3. WRITE_TIMES逻辑正确性验证(Czk)
 ### 2019年7月4日
 1. 使用index[]数组来替换WRITE_TIMES逻辑
 2. 加入线程对的速度测试，使用SPD_TEST开关

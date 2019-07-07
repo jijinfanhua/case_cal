@@ -32,12 +32,13 @@ using namespace chrono;
 SmallLRU *smalllru[THREAD_NUM];
 BigLRU *biglru[THREAD_NUM];
 volatile int index1[THREAD_NUM] , index2[THREAD_NUM];
-double dur[THREAD_NUM];
 #if SPD_TEST
-bool startFlag = true, endFlag = true;
-auto start = system_clock::now();
-auto finish = system_clock::now();
+volatile double dur[THREAD_NUM];
+bool startFlag[THREAD_NUM], endFlag[THREAD_NUM];
+time_point<system_clock> start[THREAD_NUM];
+time_point<system_clock> finish[THREAD_NUM];
 #endif
+
 void SplitString(const string &s, vector<string> &v, const string &c) {
     string::size_type pos1, pos2;
     pos2 = s.find(c);
@@ -89,7 +90,6 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
     int found = 0;
     case_bytecnt_t value = 0;
     while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
-
         flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
         if (flag_LRU_1 == 0) {
             Flow_ID = temp_LRU_1.flow_id;
@@ -131,6 +131,10 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
     return nullptr;
 }
 void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
+#if SPD_TEST
+	startFlag[arg->LRU_index] = true;
+	endFlag[arg->LRU_index] = true;
+#endif
     BigLRU *lru2 = biglru[arg->LRU_index];
     struct desc_item temp_LRU_2;
     case_flowid_t Flow_ID = 0;
@@ -140,14 +144,15 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
     //cout << SCALE/THREAD_NUM*WRITE_TIMES << endl;
     while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
 #if SPD_TEST
-		if (startFlag && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * START_PERCENT)) {
-			start = system_clock::now();
-			startFlag = false;
+		if (startFlag[arg->LRU_index] && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * START_PERCENT)) {
+			start[arg->LRU_index] = system_clock::now();
+			startFlag[arg->LRU_index] = false;
 		}
-		if (endFlag && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * END_PERCENT)) {
-			finish = system_clock::now();
-			dur[arg->LRU_index] = ((duration<double>)(finish - start)).count();
-			endFlag = false;
+		if (endFlag[arg->LRU_index] && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * END_PERCENT)) {
+			finish[arg->LRU_index] = system_clock::now();
+			duration<double> diff = finish[arg->LRU_index] - start[arg->LRU_index];
+			dur[arg->LRU_index] = diff.count();
+			endFlag[arg->LRU_index] = false;
 		}
 #endif
         if (buffer_q_LRU_2[arg->LRU_index]->pop_data(&temp_LRU_2) == 0) {
