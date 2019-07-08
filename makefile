@@ -3,7 +3,7 @@ lib =
 build_dir = build
 target = CASE_Cache_parallel_LRU
 objects = main.o
-cc = g++ -std=c++11 -msse2 -mbmi -lm -Wall -fmessage-length=0 -pthread -o2
+cc = g++ -std=c++11 -msse2 -mbmi -lm -Wall -fmessage-length=0 -pthread -O3 -pg -lc
 
 $(target): $(objects)
 	$(cc) -o $(target) $(objects)
@@ -13,4 +13,4 @@ main.o: main.cpp big_lru.h small_lru.h Safe_Queue.h
 
 .PHONY: clean
 clean:
-	rm -rf $(objects)  $(target) dram*value*.txt sram*value*.txt
+	rm -rf $(objects)  $(target)

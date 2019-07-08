@@ -42,16 +42,12 @@ public:
 void BigLRU::init(int lru_size, case_flowid_t m, int hash_size) {
 	LRU_SIZE = lru_size;
 	mask = m;
-
 	lrutable = new CacheSet*[LRU_SIZE];
 	hashtable = new HashEntry*[(int)(1 << hash_size)];
-
 	head = new CacheSet();
 	tail = new CacheSet();
-
 	sram = new SRAM();
 	sram->init();
-
 	for (int i = 0; i < LRU_SIZE; i++) {
 		lrutable[i] = new CacheSet();
 		lrutable[i]->ctr = 0;
