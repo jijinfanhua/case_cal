@@ -105,12 +105,9 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
     case_bytecnt_t ByteCnt = 0;
     int found = 0;
     case_bytecnt_t value = 0;
-    int cnt = 0, cntt= 0;
     while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
         flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
-        //cntt++;
         if (unlikely(flag_LRU_1 == 0)) { // 3%
-           // cnt ++;
             Flow_ID = temp_LRU_1.flow_id;
             ByteCnt = temp_LRU_1.byte_cnt;
             found = lru1->find(Flow_ID);
@@ -163,7 +160,6 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
     case_bytecnt_t ByteCnt = 0;
     int found = 0;
 
-    int cnt = 0, cntt= 0;
     //如果要写文件要保证运行足够长的时间
     //cout << SCALE/THREAD_NUM*WRITE_TIMES << endl;
     while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
@@ -184,7 +180,6 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
             
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
-            //system_clock::now();
 
             
             if (likely((found = lru2->find(Flow_ID)) != -1)) { // 79%
@@ -198,9 +193,7 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
                 index2[arg->LRU_index] ++;
             } else {
 #if BUFF_SIZE_CONTROL
-               // cntt ++;
                 if (unlikely(coopFlag[arg->LRU_index] && buffer_q_LRU_1[arg->LRU_index] ->queue_size() > LRU1_SIZE*COOP_OFF)) {
-                 //   cnt++;
                     lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
                     index2[arg->LRU_index] ++;
                 }
@@ -218,9 +211,7 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
         if (unlikely(LRU_2_notifications[arg->LRU_index]->pop_data(&temp_LRU_2) == 0)) {
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
-          //  cntt++;
             if (unlikely((found = lru2->find(Flow_ID)) != -1)) {
-            //    cnt++;
                 lru2->insertFromOut(Flow_ID, ByteCnt, found);
             } else {
                 lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
@@ -229,7 +220,6 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
         }
     }
 
-    cout << cnt << " " << cntt << " LRU2 " << (double)cnt/cntt << endl;
     //std::cout << buffer_q_LRU_1[arg->LRU_index]->queue_size() << endl;
     //std::cout << buffer_q_LRU_2[arg->LRU_index]->queue_size() << endl;
     //std::cout << LRU_2_notifications[arg->LRU_index]->queue_size() << endl;
