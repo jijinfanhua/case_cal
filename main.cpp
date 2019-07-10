@@ -14,6 +14,9 @@
 #include <Windows.h>
 #endif
 
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 using namespace std;
 using namespace chrono;
 
@@ -45,7 +48,7 @@ time_point<system_clock> finish[THREAD_NUM];
 //LRU1队列长度控制模块
 #if BUFF_SIZE_CONTROL
 bool coopFlag[THREAD_NUM];
-#define LRU1_SIZE (SCALE/20)
+#define LRU1_SIZE 100000
 #define COOP_ON 0.9
 #define COOP_OFF 0.8
 #else
@@ -102,15 +105,19 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
     case_bytecnt_t ByteCnt = 0;
     int found = 0;
     case_bytecnt_t value = 0;
+    int cnt = 0, cntt= 0;
     while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
         flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
-        if (flag_LRU_1 == 0) {
+        //cntt++;
+        if (unlikely(flag_LRU_1 == 0)) { // 3%
+           // cnt ++;
             Flow_ID = temp_LRU_1.flow_id;
             ByteCnt = temp_LRU_1.byte_cnt;
             found = lru1->find(Flow_ID);
-            if (found != -1) {
+           
+            if (likely(found != -1)) { // 67%
                 value = lru1->insertOld(Flow_ID, ByteCnt, found);
-                if (value != 0) {
+                if (unlikely(value != 0)) { // 2%
                     temp_LRU_1.byte_cnt = value;
                     LRU_2_notifications[arg->LRU_index]->push_data(temp_LRU_1);
                 } else {
@@ -121,10 +128,6 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
                 index1[arg->LRU_index]++;
             }
         }
-#if BUFF_SIZE_CONTROL
-        if(buffer_q_LRU_1[arg->LRU_index]->queue_size()<LRU1_SIZE*COOP_OFF)
-            coopFlag[arg->LRU_index] = false;
-#endif
     }
 
 #ifdef _WIN32
@@ -159,6 +162,8 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
     case_flowid_t Flow_ID = 0;
     case_bytecnt_t ByteCnt = 0;
     int found = 0;
+
+    int cnt = 0, cntt= 0;
     //如果要写文件要保证运行足够长的时间
     //cout << SCALE/THREAD_NUM*WRITE_TIMES << endl;
     while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
@@ -174,34 +179,43 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
 			endFlag[arg->LRU_index] = false;
 		}
 #endif
-        if (buffer_q_LRU_2[arg->LRU_index]->pop_data(&temp_LRU_2) == 0) {
+
+        if (likely(buffer_q_LRU_2[arg->LRU_index]->pop_data(&temp_LRU_2) == 0)) { // almost 100%
+            
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
 
-            if ((found = lru2->find(Flow_ID)) != -1) {
+
+            
+            if (likely((found = lru2->find(Flow_ID)) != -1)) { // 79%
+               
                 lru2->insertFromOut(Flow_ID, ByteCnt, found);
                 index2[arg->LRU_index] ++;
-            } else if (ByteCnt > SMALL_BYTE_THRES) {
+            } else {
+                if (unlikely(ByteCnt > SMALL_BYTE_THRES)) { // 0%????
+                 
                 lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
                 index2[arg->LRU_index] ++;
             } else {
 #if BUFF_SIZE_CONTROL
-                if (coopFlag[arg->LRU_index]) {
+                cntt ++;
+                if (coopFlag[arg->LRU_index] && buffer_q_LRU_1[arg->LRU_index] ->queue_size() > LRU1_SIZE*COOP_OFF) {
+                    cnt++;
                     lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
                     index2[arg->LRU_index] ++;
                 }
                 else {
                     buffer_q_LRU_1[arg->LRU_index]->push_data(temp_LRU_2);
-                    if(buffer_q_LRU_1[arg->LRU_index]->queue_size()>LRU1_SIZE*COOP_ON)
-                        coopFlag[arg->LRU_index] = true;
+                    coopFlag[arg->LRU_index] = (buffer_q_LRU_1[arg->LRU_index]->queue_size()>LRU1_SIZE*COOP_ON);
                 }
 #else
                 buffer_q_LRU_1[arg->LRU_index]->push_data(temp_LRU_2);
 #endif
             }
+            }
         }
 
-        if (LRU_2_notifications[arg->LRU_index]->pop_data(&temp_LRU_2) == 0) {
+        if (unlikely(LRU_2_notifications[arg->LRU_index]->pop_data(&temp_LRU_2) == 0)) {
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
             if ((found = lru2->find(Flow_ID)) != -1) {
@@ -213,6 +227,7 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
         }
     }
 
+    cout << cnt << " " << cntt << " LRU2 " << (double)cnt/cntt << endl;
     //std::cout << buffer_q_LRU_1[arg->LRU_index]->queue_size() << endl;
     //std::cout << buffer_q_LRU_2[arg->LRU_index]->queue_size() << endl;
     //std::cout << LRU_2_notifications[arg->LRU_index]->queue_size() << endl;
