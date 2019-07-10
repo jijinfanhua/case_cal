@@ -10,7 +10,7 @@
 #define SRAM_h
 
 #include <queue>
-#include <map>
+#include <unordered_map>
 #include "cal.h"
 
 using namespace std;
@@ -25,7 +25,7 @@ public:
 
 class SRAM {
 private:
-	map<case_flowid_t, S_element> container;
+	unordered_map<case_flowid_t, S_element> container;
 	Calculate *cal;
 
 public:
@@ -46,6 +46,8 @@ public:
 };
 
 void SRAM::init() {
+	container.reserve(4096);
+
 	cal = new Calculate();
 	cal->init();
 #ifdef PRINT_CAL
@@ -61,7 +63,7 @@ void SRAM::cal_table_write_to_file() {
 #endif
 
 void SRAM::insert(case_flowid_t FlowId, case_bytecnt_t ByteCnt) {
-	map<case_flowid_t, S_element>::iterator it;
+	unordered_map<case_flowid_t, S_element>::iterator it;
 	it = container.find(FlowId);
 
 	int scale = 0;
@@ -90,7 +92,7 @@ void SRAM::insert(case_flowid_t FlowId, case_bytecnt_t ByteCnt) {
 }
 
 case_symb_t SRAM::find(case_flowid_t FlowId) {
-	map<case_flowid_t, S_element>::iterator it;
+	unordered_map<case_flowid_t, S_element>::iterator it;
 	it = container.find(FlowId);
 	if (it == container.end()) {
 		return -1;
@@ -102,7 +104,7 @@ case_symb_t SRAM::find(case_flowid_t FlowId) {
 
 void SRAM::writeToFile(string filename) {
 	FILE * fp = fopen(filename.c_str(), "w");
-	map<case_flowid_t, S_element>::iterator it;
+	unordered_map<case_flowid_t, S_element>::iterator it;
 	it = container.begin();
 #ifdef COMPRESS
 	double esti_value;

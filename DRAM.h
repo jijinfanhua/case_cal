@@ -10,14 +10,21 @@
 #define DRAM_h
 
 #include <queue>
-#include <map>
+#include <unordered_map>
 #include "cal.h"
 
 using namespace std;
 
+struct less_case_flowid_t {
+    bool operator()(const case_flowid_t & x, const case_flowid_t & y) const
+    {
+        return ((int)x < (int)y);
+    }
+};
+
 class DRAM {
 private:
-	map<case_flowid_t, case_symb_t> container;
+	unordered_map<case_flowid_t, case_symb_t> container;
 
 public:
 	void insert(case_flowid_t FlowId, case_bytecnt_t ByteCnt);
@@ -34,6 +41,9 @@ public:
 };
 
 void DRAM::init() {
+
+	container.reserve(4096);
+
 #ifdef PRINT_CAL
 	write_to_dram_count_new = 0;
 	write_to_dram_count_old = 0;
@@ -42,7 +52,7 @@ void DRAM::init() {
 
 void DRAM::insert(case_flowid_t FlowId, case_bytecnt_t ByteCnt) {
 	//return;
-	map<case_flowid_t, case_symb_t>::iterator it;
+	unordered_map<case_flowid_t, case_symb_t>::iterator it;
 	it = container.find(FlowId);
 	if (it == container.end()) {
 #ifdef PRINT_CAL
@@ -61,7 +71,7 @@ void DRAM::insert(case_flowid_t FlowId, case_bytecnt_t ByteCnt) {
 }
 
 case_symb_t DRAM::find(case_flowid_t FlowId) {
-	map<case_flowid_t, case_symb_t>::iterator it;
+	unordered_map<case_flowid_t, case_symb_t>::iterator it;
 	it = container.find(FlowId);
 	if (it == container.end()) {
 		return -1;
@@ -73,7 +83,7 @@ case_symb_t DRAM::find(case_flowid_t FlowId) {
 
 void DRAM::writeToFile(string filename) {
 	FILE * fp = fopen(filename.c_str(), "w");
-	map<case_flowid_t, case_symb_t>::iterator it;
+	unordered_map<case_flowid_t, case_symb_t>::iterator it;
 	it = container.begin();
 	while (it != container.end()) {
 		//cout << it->first << " ::" << it->second << endl;

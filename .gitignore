@@ -5,3 +5,5 @@ test.cpp
 test.o
 
 CASE_Cache_parallel_LRU
+
+.vscode/
