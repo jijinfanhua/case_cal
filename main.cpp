@@ -184,7 +184,7 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
             
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
-
+            //system_clock::now();
 
             
             if (likely((found = lru2->find(Flow_ID)) != -1)) { // 79%
@@ -198,9 +198,9 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
                 index2[arg->LRU_index] ++;
             } else {
 #if BUFF_SIZE_CONTROL
-                cntt ++;
-                if (coopFlag[arg->LRU_index] && buffer_q_LRU_1[arg->LRU_index] ->queue_size() > LRU1_SIZE*COOP_OFF) {
-                    cnt++;
+               // cntt ++;
+                if (unlikely(coopFlag[arg->LRU_index] && buffer_q_LRU_1[arg->LRU_index] ->queue_size() > LRU1_SIZE*COOP_OFF)) {
+                 //   cnt++;
                     lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
                     index2[arg->LRU_index] ++;
                 }
@@ -218,7 +218,9 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
         if (unlikely(LRU_2_notifications[arg->LRU_index]->pop_data(&temp_LRU_2) == 0)) {
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
-            if ((found = lru2->find(Flow_ID)) != -1) {
+          //  cntt++;
+            if (unlikely((found = lru2->find(Flow_ID)) != -1)) {
+            //    cnt++;
                 lru2->insertFromOut(Flow_ID, ByteCnt, found);
             } else {
                 lru2->insertFromSmallLRU(Flow_ID, ByteCnt);

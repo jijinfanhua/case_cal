@@ -62,7 +62,7 @@ public:
     }
 
 	int queue_size() {
-		return this->tail - this->head;
+		return (this->tail + this->max_length - this->head) % this->max_length;
 	}
 
 };
