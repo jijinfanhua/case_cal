@@ -35,7 +35,7 @@ public:
 	int insertFromOut(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found);
 	void setLRUTableEntry(int n, int p, int loc);
 	int add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int found);
-	int insertFromSmallLRU(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt);
+	int insertFromSmallLRU(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, case_pkt_t PktCnt);
 	void writeAllToSRAM();
 };
 
@@ -64,6 +64,7 @@ void BigLRU::init(int lru_size, case_flowid_t m, int hash_size) {
 			p[j] = 0xffffffff;
 			lrutable[i]->usage[j] = 0;
 			lrutable[i]->counter[j] = 0;
+			lrutable[i]->pkt_counter[j] = 0;
 			//printf("%u\n",lrutable[i]->flow_id.m128i_u32[j]);
 		}
 #endif
@@ -127,7 +128,9 @@ int BigLRU::insertFromOut(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int fou
 int BigLRU::add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int found) {
 	CacheSet * entry = lrutable[location];
 	if (entry->counter[found] + ByteCnt <= BIG_BYTE_THRES) {
+
 		entry->counter[found] += ByteCnt;
+		entry->pkt_counter[found] += 1;
 
 		entry->usage[found] = ++entry->ctr;// 四路组相连中最新的一个
 
@@ -147,7 +150,7 @@ int BigLRU::add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int
 	}
 	else {
 		// write to SRAM and save the flow id
-		sram->insert(Flow_id, entry->counter[found] + ByteCnt);
+		sram->insert(Flow_id, entry->counter[found] + ByteCnt, entry->pkt_counter[found] + 1);
 
 		if (entry->_previous != HEAD) {
 			if (entry->_next != TAIL) {
@@ -166,6 +169,7 @@ int BigLRU::add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int
 		}
 
 		entry->counter[found] = 0;
+		entry->pkt_counter[found] = 0;
 		entry->usage[found] = ++entry->ctr;
 
 		return 0;
@@ -173,7 +177,7 @@ int BigLRU::add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int
 	return 0;
 }
 
-int BigLRU::insertFromSmallLRU(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt) {
+int BigLRU::insertFromSmallLRU(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, case_pkt_t PktCnt) {
 	//LRU2中肯定没有这一项
 	//1. 如果LRU2没有满，则直接放在lru_index，调整相应的数值；
 	//2. 如果LRU2已经满了，也是放
@@ -200,13 +204,14 @@ int BigLRU::insertFromSmallLRU(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt) {
 			entry->flow_id.m128i_u32[imin] = Flow_ID;
 #else
 			uint *p = (uint*)(&(entry->flow_id));
-			sram->insert(p[imin], entry->counter[imin]);
+			sram->insert(p[imin], entry->counter[imin], entry->pkt_counter[imin]);
 			p[imin] = Flow_ID;
 #endif
 			//printf("%d\t%d\n", entry->flow_id.m128i_u32[imin], entry->counter[imin]);
 
 			
 			entry->counter[imin] = ByteCnt;
+			entry->pkt_counter[imin] = PktCnt;
 			entry->usage[imin] = ++entry->ctr;
 
 			lrutable[entry->_previous]->_next = TAIL;
@@ -240,12 +245,13 @@ int BigLRU::insertFromSmallLRU(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt) {
 #else
 			uint *p = (uint*)(&(entry->flow_id));
 			if(p[imin] != FLOWID_DEFAULT)
-				sram->insert(p[imin], entry->counter[imin]);
+				sram->insert(p[imin], entry->counter[imin], entry->pkt_counter[imin]);
 
 			p[imin] = Flow_ID;
 #endif
 			
 			entry->counter[imin] = ByteCnt;
+			entry->pkt_counter[imin] = PktCnt;
 			entry->usage[imin] = ++entry->ctr;
 
 			setLRUTableEntry(head->_next, HEAD, lru_pointer);
@@ -285,11 +291,12 @@ int BigLRU::insertFromSmallLRU(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt) {
 		entry->flow_id.m128i_u32[imin] = Flow_ID;
 #else
 		uint *p = (uint*)(&(entry->flow_id));
-		sram->insert(p[imin], entry->counter[imin]);
+		sram->insert(p[imin], entry->counter[imin], entry->pkt_counter[imin]);
 
 		p[imin] = Flow_ID;
 #endif
 		entry->counter[imin] = ByteCnt;
+		entry->pkt_counter[imin] = PktCnt;
 		entry->usage[imin] = ++entry->ctr;
 
 		if (head->_next != loc) {
@@ -315,6 +322,7 @@ void BigLRU::writeAllToSRAM() {
 	FILE * fp = fopen("lru2.txt","w");
 	case_flowid_t flowid = 0;
 	case_bytecnt_t count = 0;
+	case_pkt_t pkt_cnt = 0;
 	for (int i = 0; i < LRU_SIZE; i++) {
 #ifdef M128_U32
 		for (int j = 0; j < 4; j++) {
@@ -328,8 +336,8 @@ void BigLRU::writeAllToSRAM() {
 		uint *p = (uint*)(&(lrutable[i]->flow_id));
 		for (int j = 0; j < 4; j++) {
 			fprintf(fp,"%u:%lu\t",p[j], lrutable[i]->counter[j]);
-			if ((flowid = p[j]) != FLOWID_DEFAULT && (count = lrutable[i]->counter[j]) != COUNTER_DEFAULT) {
-				sram->insert(flowid, count);
+			if ((flowid = p[j]) != FLOWID_DEFAULT && (count = lrutable[i]->counter[j]) != COUNTER_DEFAULT && (pkt_cnt = lrutable[i]->pkt_counter[j]) != COUNTER_DEFAULT) {
+				sram->insert(flowid, count, pkt_cnt);
 			}
 		}
 		fprintf(fp, "\n");

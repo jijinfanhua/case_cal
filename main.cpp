@@ -29,7 +29,7 @@ using namespace chrono;
 #define SCALE 20000000
 #define WRITE true
 #define SPD_TEST true
-#define BUFF_SIZE_CONTROL true
+#define BUFF_SIZE_CONTROL false
 
 SmallLRU *smalllru[THREAD_NUM];
 BigLRU *biglru[THREAD_NUM];
@@ -48,7 +48,7 @@ time_point<system_clock> finish[THREAD_NUM];
 //LRU1队列长度控制模块
 #if BUFF_SIZE_CONTROL
 bool coopFlag[THREAD_NUM];
-#define LRU1_SIZE 100000
+#define LRU1_SIZE 10000000
 #define COOP_ON 0.9
 #define COOP_OFF 0.8
 #else
@@ -71,6 +71,7 @@ void SplitString(const string &s, vector<string> &v, const string &c) {
 struct desc_item {
     case_flowid_t flow_id;
     case_bytecnt_t byte_cnt;
+	case_pkt_t pkt_cnt;
 
     desc_item() {}
 
@@ -83,6 +84,7 @@ struct desc_item {
         ss.clear();
         ss << record[1];
         ss >> this->byte_cnt;
+		this->pkt_cnt = 1;
     }
 };
 
@@ -94,9 +96,6 @@ typedef struct LRU_Thread_Arg {
     int LRU_index;
 } LRU_Thread_Arg;
 
-
-
-
 void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
     SmallLRU *lru1 = smalllru[arg->LRU_index];
     struct desc_item temp_LRU_1;
@@ -104,18 +103,21 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
     case_flowid_t Flow_ID = 0;
     case_bytecnt_t ByteCnt = 0;
     int found = 0;
-    case_bytecnt_t value = 0;
+	pair<case_bytecnt_t, case_pkt_t> value = {0, 0};
+
     while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
         flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
-        if (unlikely(flag_LRU_1 == 0)) { // 3%
+        if ((flag_LRU_1 == 0)) { // 3% unlikely
             Flow_ID = temp_LRU_1.flow_id;
             ByteCnt = temp_LRU_1.byte_cnt;
-            found = lru1->find(Flow_ID);
+            
+			found = lru1->find(Flow_ID);
            
-            if (likely(found != -1)) { // 67%
+            if ((found != -1)) { // 67% likely
                 value = lru1->insertOld(Flow_ID, ByteCnt, found);
-                if (unlikely(value != 0)) { // 2%
-                    temp_LRU_1.byte_cnt = value;
+                if ((value.first != 0)) { // 2% unlikely
+                    temp_LRU_1.byte_cnt = value.first;
+					temp_LRU_1.pkt_cnt = value.second;
                     LRU_2_notifications[arg->LRU_index]->push_data(temp_LRU_1);
                 } else {
                     index1[arg->LRU_index]++;
@@ -158,10 +160,9 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
     struct desc_item temp_LRU_2;
     case_flowid_t Flow_ID = 0;
     case_bytecnt_t ByteCnt = 0;
+	case_pkt_t PktCnt = 0;
     int found = 0;
 
-    //如果要写文件要保证运行足够长的时间
-    //cout << SCALE/THREAD_NUM*WRITE_TIMES << endl;
     while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
 #if SPD_TEST
 		if (startFlag[arg->LRU_index] && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * START_PERCENT)) {
@@ -176,59 +177,51 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
 		}
 #endif
 
-        if (likely(buffer_q_LRU_2[arg->LRU_index]->pop_data(&temp_LRU_2) == 0)) { // almost 100%
+        if ((buffer_q_LRU_2[arg->LRU_index]->pop_data(&temp_LRU_2) == 0)) { // almost 100% likely
             
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
 
+			/*if (Flow_ID == 5)
+				cout << ByteCnt << endl;*/
             
-            if (likely((found = lru2->find(Flow_ID)) != -1)) { // 79%
-               
+            if (((found = lru2->find(Flow_ID)) != -1)) { // 79% likely
                 lru2->insertFromOut(Flow_ID, ByteCnt, found);
                 index2[arg->LRU_index] ++;
-            } else {
-                if (unlikely(ByteCnt > SMALL_BYTE_THRES)) { // 0%????
-                 
-                lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
-                index2[arg->LRU_index] ++;
-            } else {
+            } 
+			else {
 #if BUFF_SIZE_CONTROL
-                if (unlikely(coopFlag[arg->LRU_index] && buffer_q_LRU_1[arg->LRU_index] ->queue_size() > LRU1_SIZE*COOP_OFF)) {
-                    lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
+                if ((coopFlag[arg->LRU_index] && buffer_q_LRU_1[arg->LRU_index] ->queue_size() > LRU1_SIZE*COOP_OFF)) { // unlikely
+                    lru2->insertFromSmallLRU(Flow_ID, ByteCnt, PktCnt);
                     index2[arg->LRU_index] ++;
                 }
                 else {
                     buffer_q_LRU_1[arg->LRU_index]->push_data(temp_LRU_2);
-                    coopFlag[arg->LRU_index] = (buffer_q_LRU_1[arg->LRU_index]->queue_size()>LRU1_SIZE*COOP_ON);
+                    coopFlag[arg->LRU_index] = (buffer_q_LRU_1[arg->LRU_index]->queue_size() > LRU1_SIZE * COOP_ON);
                 }
 #else
                 buffer_q_LRU_1[arg->LRU_index]->push_data(temp_LRU_2);
 #endif
             }
-            }
         }
 
-        if (unlikely(LRU_2_notifications[arg->LRU_index]->pop_data(&temp_LRU_2) == 0)) {
+        if ((LRU_2_notifications[arg->LRU_index]->pop_data(&temp_LRU_2) == 0)) { //unlikely
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
-            if (unlikely((found = lru2->find(Flow_ID)) != -1)) {
+			PktCnt = temp_LRU_2.pkt_cnt;
+            if (((found = lru2->find(Flow_ID)) != -1)) { //unlikely
                 lru2->insertFromOut(Flow_ID, ByteCnt, found);
             } else {
-                lru2->insertFromSmallLRU(Flow_ID, ByteCnt);
+                lru2->insertFromSmallLRU(Flow_ID, ByteCnt, PktCnt);
             }
             index2[arg->LRU_index] ++;
         }
     }
-
-    //std::cout << buffer_q_LRU_1[arg->LRU_index]->queue_size() << endl;
-    //std::cout << buffer_q_LRU_2[arg->LRU_index]->queue_size() << endl;
-    //std::cout << LRU_2_notifications[arg->LRU_index]->queue_size() << endl;
     
 
 #ifdef _WIN32
     cout << "LRU_2_LOGIC_end : " << GetCurrentTime() << endl;
 #endif
-    //cout << "buffer_q_LRU_1 : " << LRU_1_max_length << endl;
     if (WRITE) {
         lru2->writeAllToSRAM();
         string str1 = "sram_estimate_value_";
@@ -275,7 +268,7 @@ int main() {
         biglru[i]->init(112 * 1024, 0xffff, 16);
     }
     //目前使用单线程进行读取
-    ifstream readFile("report_2013.txt");
+    ifstream readFile("D:\\report_2013.txt");
     //ifstream readFile("test_trace.txt");
     string s = "";
     int i = 0;

@@ -3,6 +3,9 @@ FARM：Fast Accurate peR-flow Measurement
 高速精确每流测量C++实现
 
 ## 更新日志
+### 2019年7月12日
+1. 删除计算模块，该模块只会降低速度
+2. 加入packet count的计数
 ### 2019年7月8日
 * 降低LRU1队列规模，采用双阈值控制LRU2逻辑协助LRU1进行数据处理。  
 目前的方案是LRU2直接将此区间段本应PUSH入LRU1队列的数据在本循环中处理，即将数据entry当做大流数据录入SRAM中。  
