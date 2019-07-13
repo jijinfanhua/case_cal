@@ -53,6 +53,8 @@ void SRAM::init() {
 }
 
 void SRAM::insert(case_flowid_t FlowId, case_bytecnt_t ByteCnt, case_pkt_t PktCnt) {
+	/*if(FlowId == -1){
+		printf("-1: %")*/
 	unordered_map<case_flowid_t, S_element>::iterator it;
 	it = container.find(FlowId);
 
@@ -97,7 +99,7 @@ void SRAM::writeToFile(string filename) {
 	double esti_value;
 	case_symb_t temp;
 	while (it != container.end()) {
-		fprintf(fp, "%d\t%lu\t%u\n", it->first, it->second.symb_value, it->second.pkt_cnt);
+		fprintf(fp, "%u\t%lu\t%u\n", it->first, it->second.symb_value, it->second.pkt_cnt);
 		it++;
 	}
 	fclose(fp);

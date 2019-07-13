@@ -34,7 +34,7 @@ public:
 	void init(int lru_size, case_flowid_t m, int hash_size);
 	int find(case_flowid_t FlowId);
 	int insertNew(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt);
-	pair<case_bytecnt_t, case_flowid_t> insertOld(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found);
+	pair<case_bytecnt_t, case_pkt_t> insertOld(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found);
 	void setLRUTableEntry(int n, int p, int loc);
 	void writeAllToDRAM();
 };
@@ -64,9 +64,9 @@ void SmallLRU::init(int lru_size, case_flowid_t m, int hash_size) {
 			//printf("%u\n",lrutable[i]->flow_id.m128i_u32[j]);
 		}
 #else
-		uint *p = (uint*)(&(lrutable[i]->flow_id));
+		//uint *p = (uint*)(&(lrutable[i]->flow_id));
 		for (int j = 0; j < 4; j++) {
-			p[j] = 0xffffffff;
+			lrutable[i]->flow_id[j] = 0xffffffff;
 			lrutable[i]->usage[j] = 0;
 			lrutable[i]->counter[j] = 0;
 			lrutable[i]->pkt_counter[j] = 0;
@@ -115,7 +115,7 @@ int SmallLRU::find(case_flowid_t FlowId) {
 #else
 	int found = 8;
 	for(int i = 0; i < 4; i++){
-		if (((uint*)&(lrutable[loc]->flow_id))[i] == FlowId){
+		if (lrutable[loc]->flow_id[i] == FlowId){
 			found = i;
 			break;
 		}
@@ -133,7 +133,7 @@ int SmallLRU::find(case_flowid_t FlowId) {
 /**
 * 已经找到，则直接加，移动指针 case_bytecnt_t
 */
-pair<case_bytecnt_t, case_flowid_t> SmallLRU::insertOld(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found) {
+pair<case_bytecnt_t, case_pkt_t> SmallLRU::insertOld(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found) {
 	case_flowid_t hash_id = Flow_ID & mask;
 	int loc = hashtable[hash_id]->cache_loc;
 	CacheSet * entry = lrutable[loc];
@@ -145,8 +145,8 @@ pair<case_bytecnt_t, case_flowid_t> SmallLRU::insertOld(case_flowid_t Flow_ID, c
 #ifdef M128_U32
 		entry->flow_id.m128i_u32[found] = 0xffffffff;
 #else
-		uint *p = (uint*)(&(entry->flow_id));
-		p[found] = 0xffffffff;
+		//uint *p = (uint*)(&(entry->flow_id));
+		entry->flow_id[found] = 0xffffffff;
 #endif
 		entry->usage[found] = 0;
 
@@ -209,10 +209,10 @@ int SmallLRU::insertNew(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt) {
 			entry->flow_id.m128i_u32[imin] = Flow_ID;
 			//printf("insertNew1: insert flow[%u] in loc[%d][%d]!\n", Flow_ID, loc, imin);
 #else
-			uint *p = (uint*)(&(entry->flow_id));
-			if(p[imin]!=0xffffffff)
-				dram->insert(p[imin], entry->counter[imin], entry->pkt_counter[imin]);
-			p[imin] = Flow_ID;
+			//uint *p = (uint*)(&(entry->flow_id));
+			if(entry->flow_id[imin]!=0xffffffff)
+				dram->insert(entry->flow_id[imin], entry->counter[imin], entry->pkt_counter[imin]);
+			entry->flow_id[imin] = Flow_ID;
 #endif
 
 			entry->counter[imin] = ByteCnt;
@@ -247,10 +247,10 @@ int SmallLRU::insertNew(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt) {
 			entry->flow_id.m128i_u32[imin] = Flow_ID;
 			//printf("insertNew2: insert flow[%u] in loc[%d][%d]!\n", Flow_ID, lru_pointer, imin);
 #else
-			uint *p = (uint*)(&(entry->flow_id));
-			if(p[imin] != 0xffffffff)
-				dram->insert(p[imin], entry->counter[imin], entry->pkt_counter[imin]);
-			p[imin] = Flow_ID;
+			//uint *p = (uint*)(&(entry->flow_id));
+			if(entry->flow_id[imin] != 0xffffffff)
+				dram->insert(entry->flow_id[imin], entry->counter[imin], entry->pkt_counter[imin]);
+			entry->flow_id[imin] = Flow_ID;
 #endif
 
 			entry->counter[imin] = ByteCnt;
@@ -291,9 +291,9 @@ int SmallLRU::insertNew(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt) {
 		entry->flow_id.m128i_u32[imin] = Flow_ID;
 		//printf("insertNew3: insert flow[%u] in loc[%d][%d]!\n", Flow_ID, loc, imin);
 #else
-		uint *p = (uint*)(&(entry->flow_id));
-		dram->insert(p[imin], entry->counter[imin], entry->pkt_counter[imin]);
-		p[imin] = Flow_ID;
+		//uint *p = (uint*)(&(entry->flow_id));
+		dram->insert(entry->flow_id[imin], entry->counter[imin], entry->pkt_counter[imin]);
+		entry->flow_id[imin] = Flow_ID;
 #endif
 		
 		entry->counter[imin] = ByteCnt;
@@ -334,10 +334,10 @@ void SmallLRU::writeAllToDRAM() {
 		}
 		fprintf(fp, "\n");
 #else
-		uint *p = (uint*)(&(lrutable[i]->flow_id));
+		//uint *p = (uint*)(&(lrutable[i]->flow_id));
 		for (int j = 0; j < 4; j++) {
-			fprintf(fp,"%u:%lu %u\t",p[j], lrutable[i]->counter[j], lrutable[i]->pkt_counter[j]);
-			if ((flowid = p[j]) != FLOWID_DEFAULT && (count = lrutable[i]->counter[j]) != COUNTER_DEFAULT && ((pkt_cnt = lrutable[i]->pkt_counter[j]) != PKT_COUNTER_DEFAULT)) {
+			fprintf(fp,"%u:%lu %u\t", lrutable[i]->flow_id[j], lrutable[i]->counter[j], lrutable[i]->pkt_counter[j]);
+			if ((flowid = lrutable[i]->flow_id[j]) != FLOWID_DEFAULT && (count = lrutable[i]->counter[j]) != COUNTER_DEFAULT && ((pkt_cnt = lrutable[i]->pkt_counter[j]) != PKT_COUNTER_DEFAULT)) {
 				dram->insert(flowid, count, pkt_cnt);
 			}
 		}

@@ -33,7 +33,8 @@ using namespace chrono;
 
 SmallLRU *smalllru[THREAD_NUM];
 BigLRU *biglru[THREAD_NUM];
-volatile int index1[THREAD_NUM] , index2[THREAD_NUM];
+
+volatile int index1[THREAD_NUM] = { 0 }, index2[THREAD_NUM] = { 0 };
 
 //线程内区间速度测试模块
 #if SPD_TEST
@@ -92,6 +93,10 @@ QUEUE_DATA<desc_item> *buffer_q_LRU_1[THREAD_NUM];
 QUEUE_DATA<desc_item> *buffer_q_LRU_2[THREAD_NUM];
 QUEUE_DATA<desc_item> *LRU_2_notifications[THREAD_NUM];
 
+case_flowid_t lru1_arr[SCALE] = { 0 };
+case_flowid_t lru2_arr[SCALE] = { 0 };
+int lru1_index = 0, lru2_index = 0;
+
 typedef struct LRU_Thread_Arg {
     int LRU_index;
 } LRU_Thread_Arg;
@@ -105,7 +110,7 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
     int found = 0;
 	pair<case_bytecnt_t, case_pkt_t> value = {0, 0};
 
-    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
+    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM) {
         flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
         if ((flag_LRU_1 == 0)) { // 3% unlikely
             Flow_ID = temp_LRU_1.flow_id;
@@ -145,8 +150,9 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
 #endif
     return nullptr;
 }
-void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
 
+
+void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
 #if SPD_TEST
 	startFlag[arg->LRU_index] = true;
 	endFlag[arg->LRU_index] = true;
@@ -163,7 +169,7 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
 	case_pkt_t PktCnt = 0;
     int found = 0;
 
-    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
+    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM) {
 #if SPD_TEST
 		if (startFlag[arg->LRU_index] && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * START_PERCENT)) {
 			start[arg->LRU_index] = system_clock::now();
@@ -181,12 +187,10 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
             
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
-
-			/*if (Flow_ID == 5)
-				cout << ByteCnt << endl;*/
+			PktCnt = temp_LRU_2.pkt_cnt;
             
             if (((found = lru2->find(Flow_ID)) != -1)) { // 79% likely
-                lru2->insertFromOut(Flow_ID, ByteCnt, found);
+                lru2->insertFromOut(Flow_ID, ByteCnt, found, PktCnt);
                 index2[arg->LRU_index] ++;
             } 
 			else {
@@ -209,8 +213,9 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
             Flow_ID = temp_LRU_2.flow_id;
             ByteCnt = temp_LRU_2.byte_cnt;
 			PktCnt = temp_LRU_2.pkt_cnt;
+			
             if (((found = lru2->find(Flow_ID)) != -1)) { //unlikely
-                lru2->insertFromOut(Flow_ID, ByteCnt, found);
+                lru2->insertFromOut(Flow_ID, ByteCnt, found, PktCnt);
             } else {
                 lru2->insertFromSmallLRU(Flow_ID, ByteCnt, PktCnt);
             }
@@ -260,7 +265,7 @@ int main() {
         index1[i]=index2[i]=0;
         LRU_args[i].LRU_index = i;
         buffer_q_LRU_1[i] = new QUEUE_DATA<desc_item>(LRU1_SIZE);
-        buffer_q_LRU_2[i] = new QUEUE_DATA<desc_item>(SCALE);
+        buffer_q_LRU_2[i] = new QUEUE_DATA<desc_item>(SCALE + 1);
         LRU_2_notifications[i] = new QUEUE_DATA<desc_item>(1024);
         smalllru[i] = new SmallLRU();
         biglru[i] = new BigLRU();
@@ -274,11 +279,10 @@ int main() {
     int i = 0;
     while (getline(readFile, s) && i < SCALE) {
         struct desc_item entry(s);
-        //cout << i%THREAD_NUM << endl;
         buffer_q_LRU_2[i % THREAD_NUM]->push_data(entry);
         i++;
     }
-    printf("ok\n");
+    printf("read ok\n");
 
     for (int i = 0; i < THREAD_NUM; i++) {
         //cout << i << " : " << buffer_q_LRU_2[i]->queue_size() << endl;
@@ -305,6 +309,18 @@ int main() {
 		std::cout<<"index1["<<i<<"]:"<<index1[i]<<"  index2["<<i<<"]:"<<index2[i]<<endl;
 	}
 #endif
+
+	FILE * fp = fopen("lru1_sequence.txt", "w");
+	for (int i = 0; i < lru1_index; i++) {
+		fprintf(fp, "%d\n", lru1_arr[i]);
+	}
+	fclose(fp);
+
+	fp = fopen("lru2_sequence.txt", "w");
+	for (int i = 0; i < lru2_index; i++) {
+		fprintf(fp, "%d\n", lru2_arr[i]);
+	}
+	fclose(fp);
 
     for (int i = 0; i < THREAD_NUM; i++) {
         delete smalllru[i];

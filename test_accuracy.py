@@ -107,7 +107,7 @@ def cmp_real_and_cal(SRAM_byte_dict, SRAM_pkt_dict, DRAM_byte_dict, DRAM_pkt_dic
         for item in DRAM_byte_dict.keys():
             if item in REAL_byte_dict.keys():
                 f.write(str(item) + '\t' + str(DRAM_byte_dict[item]) + '\t' + str(REAL_byte_dict[item]) + '\t' + str(DRAM_pkt_dict[item]) + '\t' + str(REAL_pkt_dict[item]) + '\n')
-    print('generate dram byte and packets compare in sram_cmp.txt!')
+    print('generate dram byte and packets compare in dram_cmp.txt!')
 
 if __name__ == '__main__':
     THREAD_NUM = 1

@@ -22,7 +22,7 @@
 class CacheSet {
 public:
 	//CacheSet(int previous, int next):_previous(previous), _next(next){};
-	__m128i flow_id;
+	case_flowid_t flow_id[4];
 	case_bytecnt_t counter[4];
 	case_pkt_t pkt_counter[4];
 	int usage[4];
