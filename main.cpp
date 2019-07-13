@@ -105,7 +105,7 @@ void *LRU_1_LOGIC(LRU_Thread_Arg *arg) {
     int found = 0;
 	pair<case_bytecnt_t, case_pkt_t> value = {0, 0};
 
-    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
+    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM) {
         flag_LRU_1 = buffer_q_LRU_1[arg->LRU_index]->pop_data(&temp_LRU_1);
         if ((flag_LRU_1 == 0)) { // 3% unlikely
             Flow_ID = temp_LRU_1.flow_id;
@@ -163,7 +163,7 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
 	case_pkt_t PktCnt = 0;
     int found = 0;
 
-    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM-1) {
+    while (index1[arg->LRU_index] + index2[arg->LRU_index] < SCALE/THREAD_NUM) {
 #if SPD_TEST
 		if (startFlag[arg->LRU_index] && (index1[arg->LRU_index] + index2[arg->LRU_index] > SCALE / THREAD_NUM * START_PERCENT)) {
 			start[arg->LRU_index] = system_clock::now();
@@ -210,7 +210,7 @@ void *LRU_2_LOGIC(LRU_Thread_Arg *arg) {
             ByteCnt = temp_LRU_2.byte_cnt;
 			PktCnt = temp_LRU_2.pkt_cnt;
             if (((found = lru2->find(Flow_ID)) != -1)) { //unlikely
-                lru2->insertFromOut(Flow_ID, ByteCnt, found);
+                lru2->insertFromOut(Flow_ID, ByteCnt, found, PktCnt);
             } else {
                 lru2->insertFromSmallLRU(Flow_ID, ByteCnt, PktCnt);
             }
@@ -260,7 +260,7 @@ int main() {
         index1[i]=index2[i]=0;
         LRU_args[i].LRU_index = i;
         buffer_q_LRU_1[i] = new QUEUE_DATA<desc_item>(LRU1_SIZE);
-        buffer_q_LRU_2[i] = new QUEUE_DATA<desc_item>(SCALE);
+        buffer_q_LRU_2[i] = new QUEUE_DATA<desc_item>(SCALE+1);
         LRU_2_notifications[i] = new QUEUE_DATA<desc_item>(1024);
         smalllru[i] = new SmallLRU();
         biglru[i] = new BigLRU();
@@ -268,7 +268,7 @@ int main() {
         biglru[i]->init(112 * 1024, 0xffff, 16);
     }
     //目前使用单线程进行读取
-    ifstream readFile("D:\\report_2013.txt");
+    ifstream readFile("report_2013.txt");
     //ifstream readFile("test_trace.txt");
     string s = "";
     int i = 0;

@@ -32,9 +32,9 @@ public:
 public:
 	void init(int lru_size, case_flowid_t m, int hash_size);
 	int find(case_flowid_t Flow_ID);
-	int insertFromOut(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found);
+	int insertFromOut(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found, case_pkt_t PktCnt);
 	void setLRUTableEntry(int n, int p, int loc);
-	int add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int found);
+	int add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int found, case_pkt_t PktCnt);
 	int insertFromSmallLRU(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, case_pkt_t PktCnt);
 	void writeAllToSRAM();
 };
@@ -115,9 +115,9 @@ int BigLRU::find(case_flowid_t Flow_ID) {
 	}
 }
 
-int BigLRU::insertFromOut(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found) {
+int BigLRU::insertFromOut(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int found, case_pkt_t PktCnt=1) {
 	case_flowid_t hash_id = Flow_ID & mask;
-	add(Flow_ID, hashtable[hash_id]->cache_loc, ByteCnt, found);
+	add(Flow_ID, hashtable[hash_id]->cache_loc, ByteCnt, found, PktCnt);
 	return 1;
 }
 
@@ -125,12 +125,12 @@ int BigLRU::insertFromOut(case_flowid_t Flow_ID, case_bytecnt_t ByteCnt, int fou
 /**
 超过LRU2阈值与不超过LRU2阈值
 */
-int BigLRU::add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int found) {
+int BigLRU::add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int found, case_pkt_t PktCnt=1) {
 	CacheSet * entry = lrutable[location];
 	if (entry->counter[found] + ByteCnt <= BIG_BYTE_THRES) {
 
 		entry->counter[found] += ByteCnt;
-		entry->pkt_counter[found] += 1;
+		entry->pkt_counter[found] += PktCnt;
 
 		entry->usage[found] = ++entry->ctr;// 四路组相连中最新的一个
 
@@ -150,7 +150,7 @@ int BigLRU::add(case_flowid_t Flow_id, int location, case_bytecnt_t ByteCnt, int
 	}
 	else {
 		// write to SRAM and save the flow id
-		sram->insert(Flow_id, entry->counter[found] + ByteCnt, entry->pkt_counter[found] + 1);
+		sram->insert(Flow_id, entry->counter[found] + ByteCnt, entry->pkt_counter[found] + PktCnt);
 
 		if (entry->_previous != HEAD) {
 			if (entry->_next != TAIL) {

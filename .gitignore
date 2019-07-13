@@ -1,6 +1,9 @@
 *.txt
 *.o
+*.backup
 
 CASE_Cache_parallel_LRU
 
 .vscode/
+test
+test.*

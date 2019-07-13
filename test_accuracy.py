@@ -31,7 +31,7 @@ def load_real_trace(filename_real_trace):
     with open(filename_real_trace, 'r') as f_REAL:
         for REAL_temp in f_REAL.readlines():
             split_REAL_temp = REAL_temp.split()
-            flow_id, byte_value, pkt_value = int(split_REAL_temp[0]), int(split_REAL_temp[1]), int(split_REAL_temp[2])
+            flow_id, byte_value, pkt_value = int(split_REAL_temp[0]), int(split_REAL_temp[1]), 0 #int(split_REAL_temp[2])
             REAL_byte_dict[flow_id] = REAL_byte_dict.get(flow_id, 0) + byte_value
             REAL_pkt_dict[flow_id] = REAL_pkt_dict.get(flow_id, 0) + pkt_value
             byte_sum += byte_value
@@ -114,7 +114,7 @@ if __name__ == '__main__':
     SCALE = 20000000
     filename_DRAM = "dram_accurate_value_"
     filename_SRAM = "sram_estimate_value_"
-    filename_real_trace = "real_trace_20000000_new.txt"
+    filename_real_trace = "real_trace_20000000.txt"
 
     # generate_real_trace(SCALE, filename_real_trace) # use this to generate real trace
     REAL_byte_dict, REAL_pkt_dict = load_real_trace(filename_real_trace)
