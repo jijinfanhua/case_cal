@@ -26,7 +26,6 @@ public:
 		this->max_length = queue_size;
 		this->data = new T[queue_size];
 	}
-	//����ָ���Ա����д�������캯��������Ұָ��
 	QUEUE_DATA(const QUEUE_DATA &queue_data) {
 		this->head = queue_data->head;
         this->tail = queue_data->tail;
