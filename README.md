@@ -29,3 +29,7 @@ FARM：Fast Accurate peR-flow Measurement
 * WRITE 是否将LRU写入文件
 * SPD_TEST 是否编译线程速度测试内容
 * START_PERCENT & END_PERCENT 单线程速度测试范围(以百分比计)
+```
+var a = 123;
+s = c + d
+```
