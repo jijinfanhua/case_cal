@@ -1,5 +1,7 @@
 # 本地模型部署方案：48GB Mac + Hermes/OpenClaw Agent 省 Token 策略
 
+> **详细安装与对接指南请看** → [local-model-setup-guide.md](./local-model-setup-guide.md)
+
 ## 一、问题分析
 
 你当前的痛点：Hermes Agent token 消耗太快，云端 API 费用高。同时 Mac 上还跑着 Hermes、OpenClaw 等 agents。
